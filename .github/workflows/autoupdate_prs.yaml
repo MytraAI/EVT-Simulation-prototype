@@ -1,0 +1,14 @@
+name: Autoupdate Pull Requests
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: "update-prs-${{ github.ref_name }}"
+  cancel-in-progress: true
+
+jobs:
+  autoupdate-prs:
+    uses: MytraAI/mytra-github-workflows/.github/workflows/autoupdate_prs.yaml@v1
+    secrets: inherit

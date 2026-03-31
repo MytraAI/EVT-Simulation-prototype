@@ -1,0 +1,29 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mytra-site-bot
+  namespace: flux-system
+spec:
+  targetNamespace: flux-system
+  releaseName: mytra-site-bot
+  chart:
+    spec:
+      chart: mytra-site-bot
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: mytra-helm-charts
+      version: 0.0.4
+  install:
+    disableWait: true
+    createNamespace: true
+  upgrade:
+    disableWait: true
+  interval: 10s
+  valuesFrom:
+  - kind: ConfigMap
+    name: site-values
+  - kind: ConfigMap
+    name: bot-default-values
+  - kind: ConfigMap
+    name: bot-specific-values

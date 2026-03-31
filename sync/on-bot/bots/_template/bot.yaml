@@ -1,0 +1,12 @@
+bot:  # most per-bot parameters need only be set here
+  name: null  # REQUIRED
+  genealogy: null  # REQUIRED
+  ipAddress: null  # REQUIRED
+  version: null  # REQUIRED
+  adsNetId: null
+  foxgloveDeviceToken: null
+  cameras:
+    x_minus_mx_id: null
+    x_plus_mx_id: null
+    y_minus_mx_id: null
+    y_plus_mx_id: null

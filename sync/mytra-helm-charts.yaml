@@ -1,0 +1,51 @@
+apiVersion: external-secrets.io/v1
+kind: ClusterExternalSecret
+metadata:
+  name: "mytra-artifacts-image-pull-secret-multiple-regions"
+spec:
+  externalSecretName: "mytra-artifacts-image-pull-secret-multiple-regions"
+  namespaceSelectors:
+  - matchExpressions:
+    - { key: doesNotExist, operator: NotIn, values: [doesNotExist] }
+  refreshTime: "1m"
+  externalSecretSpec:
+    refreshInterval: 1m
+    secretStoreRef:
+      name: gcloud-secretstore
+      kind: ClusterSecretStore
+    target:    
+      template:
+        type: kubernetes.io/dockerconfigjson
+        data:
+          .dockerconfigjson: "{{ .dockerconfigjson | toString }}"
+      name: mytra-artifacts-image-pull-secret-multiple-regions
+      creationPolicy: Owner
+    data:
+    - secretKey: dockerconfigjson
+      remoteRef:
+        key: mytra-artifacts-image-pull-secret-multiple-regions
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: mytra-helm-charts
+  namespace: flux-system
+spec:
+  interval: 10s
+  ref:
+    branch: main
+  secretRef:
+    name: github-token
+  url: https://github.com/MytraAI/mytra-helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: mytra-helm-charts
+  namespace: flux-system
+spec:
+  interval: 10s
+  url: oci://us-docker.pkg.dev/mytra-artifacts/mytra-helm-charts
+  type: oci
+  secretRef:
+    name: mytra-artifacts-image-pull-secret-multiple-regions

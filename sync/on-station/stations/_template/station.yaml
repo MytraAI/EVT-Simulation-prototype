@@ -1,0 +1,6 @@
+station:
+  name: null  # REQUIRED
+  opcell_id: null  # REQUIRED
+
+cluster:
+  name: null  # REQUIRED - typically matches station name

@@ -1,0 +1,40 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mytra-site-station
+  namespace: flux-system
+spec:
+  targetNamespace: flux-system
+  releaseName: mytra-site-station
+  chart:
+    spec:
+      chart: mytra-site-station
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: mytra-helm-charts
+      version: 0.0.1
+  install:
+    disableWait: true
+    createNamespace: true
+    timeout: 10m
+  upgrade:
+    force: false
+    timeout: 5m
+    disableWait: true
+    disableWaitForJobs: true
+  uninstall:
+    timeout: 10m
+    disableWait: false
+  driftDetection:
+    mode: disabled
+  interval: 10s
+  valuesFrom:
+    - kind: ConfigMap
+      name: site-values
+    - kind: ConfigMap
+      name: station-default-values
+    - kind: ConfigMap
+      name: station-values
+    - kind: ConfigMap
+      name: photobooth-calibration-values

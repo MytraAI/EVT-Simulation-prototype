@@ -1,0 +1,17 @@
+name: Clean Slate Neo Checkout
+run-name: Clean Slate Neo Checkout for ${{ inputs.bot_name && inputs.bot_name || 'all bots' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      bot_name:
+        required: false
+        type: string
+        description: "Name of the bot to clean checkout for. If empty will default to all bots."
+
+jobs:
+  clean_slate_neo:
+    uses: MytraAI/mytra-github-workflows/.github/workflows/clean_slate_neo.yaml@v1
+    secrets: inherit
+    with:
+      bot_name: ${{ inputs.bot_name }}

@@ -1,0 +1,71 @@
+name: Configure Bot & Vision Deployments
+run-name: Configure ${{ inputs.bot_name && inputs.bot_name  || ' default bot deployments' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      bot_name:
+        description: "BOT NAME - if null, will set defaults"
+        type: string
+        required: false
+      manager_controller_version:
+        description: "NEO DERIVED IMAGES TAG e.g. `main`, `v1.0.0` `c02daf9` `c02daf9ab778af4df9ccdf192a74777e6ca086d6`"
+        type: string
+        required: false
+      vision_version:
+        description: "VISION IMAGE TAG ^see e.g. above^"
+        type: string
+        required: false
+      morpheus_version:
+        description: "MORPHEUS IMAGE TAG ^see e.g. above^"
+        type: string
+        required: false
+      manager_controller_dev_mode:
+        description: "MANAGER CONTROLLER DEV MODE - allows side loading neo_software from disk"
+        required: false
+        default: " "
+        type: choice
+        options:
+          - " "
+          - true
+          - false
+      neo_dev_mode:
+        description: "NEO DEV MODE - allows side loading neo_firmware.bin from disk"
+        default: " "
+        type: choice
+        options:
+          - " "
+          - true
+          - false
+      neo_force_flash:
+        description: "NEO FORCE FLASH - flash even if binaries match"
+        default: " "
+        type: choice
+        options:
+          - " "
+          - true
+          - false
+      bot_genealogy:
+        description: "BOT GENEALOGY - used to derive flasher image and morpheus config"
+        type: choice
+        options:
+          - " "
+          - gen2_alpha
+          - gen2_beta1
+          - gen2_beta2
+        required: false
+        default: " "
+
+jobs:
+  configure-bot-deployment:
+    uses: MytraAI/mytra-helm-charts/.github/workflows/configure_bot_deployment.yaml@main
+    secrets: inherit
+    with:
+      bot_name: ${{ inputs.bot_name }}
+      manager_controller_version: ${{ inputs.manager_controller_version }}
+      vision_version: ${{ inputs.vision_version }}
+      morpheus_version: ${{ inputs.morpheus_version }}
+      manager_controller_dev_mode: ${{ inputs.manager_controller_dev_mode }}
+      neo_dev_mode: ${{ inputs.neo_dev_mode }}
+      neo_force_flash: ${{ inputs.neo_force_flash }}
+      bot_genealogy: ${{ inputs.bot_genealogy }}

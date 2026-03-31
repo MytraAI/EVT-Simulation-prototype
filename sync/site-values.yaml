@@ -1,0 +1,5 @@
+site:
+  name: {{ site }}  # REQUIRED
+  subdomain: {{ subdomain }}
+  dnsRecursiveNameservers: {{ dns_recursive_nameservers }}  # REQUIRED
+  externalServiceType: LoadBalancer

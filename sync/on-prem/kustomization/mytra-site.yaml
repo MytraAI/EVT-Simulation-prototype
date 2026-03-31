@@ -1,0 +1,36 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mytra-site
+  namespace: flux-system
+spec:
+  targetNamespace: flux-system
+  releaseName: mytra-site
+  chart:
+    spec:
+      chart: mytra-site
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: mytra-helm-charts
+      version: 0.0.12 # {"$imagepolicy": "flux-system:mytra-helm-charts-mytra-site:tag"}
+  install:
+    disableWait: true
+    createNamespace: true
+    timeout: 5m
+  upgrade:
+    force: false
+    timeout: 5m
+    disableWait: true
+    disableWaitForJobs: true
+  uninstall:
+    disableWait: false
+    timeout: 5m
+  driftDetection:
+    mode: disabled
+  interval: 10s
+  valuesFrom:
+    - kind: ConfigMap
+      name: site-values
+    - kind: ConfigMap
+      name: cluster-values

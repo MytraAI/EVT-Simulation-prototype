@@ -1,0 +1,17 @@
+cluster:
+  nodes: {{ nodes }}
+  ingress:
+    enabled: true
+  adsNetId: {{ ads_net_id }}
+  twinCatHost: {{ twin_cat_host }}
+  loadBalancer:
+    addressRangeStart: {{ metallb_address_range_start }}  # e.g. 10.100.200.40
+    addressRangeEnd: {{ metallb_address_range_end }}    # e.g. 10.100.200.49
+  storage:
+    type: nfs
+    server: {{ nfs_server }}  # Inferred if not specified
+    path: /srv
+
+helmReleases:
+  mytraPortal:
+    instances: []
