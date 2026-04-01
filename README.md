@@ -1,6 +1,6 @@
 # EVT Warehouse Simulator
 
-Discrete-event warehouse simulation for estimating throughput, weight-level balance, and operational metrics. Load a map JSON, configure bots and shifts, and run simulations.
+Simple Discrete-event warehouse simulation for estimating throughput, weight-level balance, and operational metrics. Load a map JSON, configure bots and shifts, and run simulations.
 
 ## Prerequisites
 
