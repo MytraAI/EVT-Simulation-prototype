@@ -115,6 +115,14 @@ export function ConfigPanel() {
           <h1 className="text-sm font-semibold text-cyan-400 tracking-wide">
             EVT WAREHOUSE SIM
           </h1>
+          <a
+            href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2 py-0.5 text-[10px] rounded bg-purple-600/30 text-purple-300 hover:bg-purple-500 hover:text-white transition-colors cursor-pointer animate-pulse"
+          >
+            click me
+          </a>
         </div>
       </div>
 
