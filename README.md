@@ -5,11 +5,38 @@ Discrete-event warehouse simulation for estimating throughput, weight-level bala
 ## Prerequisites
 
 - **Node.js** 18+ and npm
-- **Go** 1.22+ (for WASM pathfinder build)
+- **Go** — auto-installed locally by `make setup` if not found
+
+### Installing Node.js
+
+**macOS** (via Homebrew):
+```bash
+brew install node
+```
+
+**Linux** (Ubuntu/Debian):
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+**Any platform**: Download from https://nodejs.org
+
+### Go (optional)
+
+Go is only needed to build the WASM pathfinder. If Go is not installed, `make setup` will automatically download Go 1.23.4 to a local `.local/go` directory — no system install required.
+
+To install Go system-wide instead:
+
+**macOS**: `brew install go`
+
+**Linux**: `sudo apt-get install golang-go` or download from https://go.dev/dl
 
 ## Quick Start
 
 ```bash
+git clone https://github.com/MytraAI/EVT-Simulation-prototype.git
+cd EVT-Simulation-prototype
 make setup   # install deps + build WASM (first time only)
 make dev     # start dev server on port 5173
 ```

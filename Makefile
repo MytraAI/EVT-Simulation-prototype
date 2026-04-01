@@ -1,6 +1,6 @@
 .PHONY: setup wasm app dev build clean help ensure-go ensure-node
 
-GO_VERSION := 1.22.5
+GO_VERSION := 1.23.4
 GO_LOCAL := $(CURDIR)/.local/go
 GO_BIN := $(GO_LOCAL)/bin/go
 NODE_MIN := 18
@@ -12,7 +12,14 @@ setup: ensure-node ensure-go wasm app ## First-time setup: install deps + build 
 
 ensure-node:
 	@if ! command -v node >/dev/null 2>&1; then \
-		echo "Error: Node.js is required but not found. Install Node.js $(NODE_MIN)+ from https://nodejs.org"; \
+		echo ""; \
+		echo "  Node.js is required but not found."; \
+		echo ""; \
+		echo "  Install options:"; \
+		echo "    macOS:   brew install node"; \
+		echo "    Linux:   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs"; \
+		echo "    Any:     https://nodejs.org/en/download"; \
+		echo ""; \
 		exit 1; \
 	fi
 	@NODE_VER=$$(node -v | sed 's/v//' | cut -d. -f1); \
@@ -46,10 +53,29 @@ ensure-go:
 # Resolve which go binary to use
 GO = $(shell command -v go 2>/dev/null || echo "$(GO_BIN)")
 
+# Find wasm_exec.js — location varies by Go version:
+#   Go <= 1.23: misc/wasm/wasm_exec.js
+#   Go >= 1.24: lib/wasm/wasm_exec.js
+WASM_EXEC_JS = $(shell \
+	GOROOT=$$($(GO) env GOROOT 2>/dev/null); \
+	if [ -f "$$GOROOT/lib/wasm/wasm_exec.js" ]; then \
+		echo "$$GOROOT/lib/wasm/wasm_exec.js"; \
+	elif [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
+		echo "$$GOROOT/misc/wasm/wasm_exec.js"; \
+	else \
+		echo ""; \
+	fi \
+)
+
 wasm: ensure-go ## Build Go WASM pathfinder
 	@echo "Building WASM pathfinder..."
 	cd wasm && GOOS=js GOARCH=wasm $(GO) build -o ../app/public/pathfinder.wasm .
-	cp "$$($(GO) env GOROOT)/lib/wasm/wasm_exec.js" app/public/wasm_exec.js
+	@if [ -z "$(WASM_EXEC_JS)" ]; then \
+		echo "Error: wasm_exec.js not found in Go installation"; \
+		exit 1; \
+	fi
+	cp "$(WASM_EXEC_JS)" app/public/wasm_exec.js
+	@echo "WASM build complete"
 
 app: ensure-node ## Install frontend dependencies
 	@echo "Installing frontend dependencies..."
