@@ -126,3 +126,28 @@ cd wasm && make build
 
 Outputs `pathfinder.wasm` and `wasm_exec.js` to `app/public/`.
 
+## Troubleshooting
+
+**`npm install` fails with EACCES / permission errors:**
+
+npm's global cache directory may be owned by root. Fix with:
+
+```bash
+sudo chown -R $(whoami) ~/.npm
+```
+
+**WASM build fails with "wasm_exec.js not found":**
+
+Your Go version may be too old. Run `make clean` and `make setup` to re-download a compatible Go version, or install Go 1.23+ manually.
+
+**"WebGL context could not be created" in browser:**
+
+The 3D view requires WebGL. If your browser has GPU acceleration disabled, the app falls back to a 2D canvas view automatically. To enable WebGL in Chrome: go to `chrome://settings/system` and enable "Use graphics acceleration when available".
+
+**Port 5173 already in use:**
+
+Kill the existing process or use a different port:
+
+```bash
+cd app && npx vite --port 3000
+```
