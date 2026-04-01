@@ -79,6 +79,7 @@ export function selectInductionPosition(
   graph: WarehouseGraph,
   state: SimState,
   palletWeightKg: number,
+  palletHeightM: number,
   levelMaxMass: Map<number, number>,
   pendingInductPositions: Set<string>,
   palletVelocity: Velocity = "medium",
@@ -92,12 +93,9 @@ export function selectInductionPosition(
 
   if (candidates.length === 0) return null;
 
-  // Pre-compute current state
   const levelStats = computeLevelStats(graph, state);
   const radialStats = computeRadialStats(graph, state);
   const blockerCounts = computeBlockerExposure(graph, state);
-
-  // Sort levels bottom-up
   const sortedLevels = Array.from(levelStats.keys()).sort((a, b) => a - b);
 
   const scored: PositionScore[] = [];
@@ -106,21 +104,35 @@ export function selectInductionPosition(
     let score = 0;
 
     const maxMass = levelMaxMass.get(node.level) ?? 1000;
+    const maxHeight = node.max_pallet_height_m;
 
-    // --- 1. Weight-level enforcement (0-50 pts) ---
-    // Hard constraint: pallet must not exceed level capacity
+    // --- Hard constraints: skip positions that violate limits ---
+    // Height restriction: pallet must fit within level's max height
+    if (palletHeightM > maxHeight) {
+      continue; // skip entirely — not a valid position
+    }
+    // Weight restriction
     if (palletWeightKg > maxMass) {
-      score -= 100; // severe penalty, effectively eliminates
-    } else {
-      // Prefer lower levels for heavier pallets (bottom-up filling)
-      // Level index: 0 = ground, 1 = first floor, etc.
+      continue; // skip entirely
+    }
+
+    // --- 1. Weight+Height level enforcement (0-50 pts) ---
+    // Tall/heavy pallets strongly prefer low levels; short/light prefer high levels.
+    {
       const levelIdx = sortedLevels.indexOf(node.level);
       const levelCount = sortedLevels.length;
-      // Heavy pallets get bonus for being on low levels
+      const levelFrac = levelIdx / Math.max(1, levelCount - 1); // 0=bottom, 1=top
+
+      // Weight component: heavy → bottom
       const weightRatio = palletWeightKg / maxMass;
-      const levelPreference = 1 - (levelIdx / Math.max(1, levelCount - 1));
-      // Heavy pallets (high ratio) strongly prefer low levels
-      score += levelPreference * weightRatio * 50;
+      const weightPref = (1 - levelFrac) * weightRatio;
+
+      // Height component: tall → bottom, short → top
+      const heightRatio = palletHeightM / maxHeight;
+      const heightPref = (1 - levelFrac) * heightRatio;
+
+      // Combined: both push tall/heavy to bottom, light/short to top
+      score += (weightPref * 25 + heightPref * 25);
     }
 
     // --- 2. Bottom-up fill order (0-30 pts) ---
@@ -269,6 +281,7 @@ export type BalanceMetrics = {
     weightKg: number;
     maxKg: number;
     maxPerPositionKg: number;
+    maxHeightM: number;
     fillPct: number;
     count: number;
   }[];
@@ -288,6 +301,15 @@ export function computeBalanceMetrics(
   const levelStats = computeLevelStats(graph, state);
   const radial = computeRadialStats(graph, state);
 
+  // Compute max pallet height per level from graph nodes
+  const levelMaxHeight = new Map<number, number>();
+  for (const node of graph.data.nodes) {
+    if (node.kind === "PALLET_POSITION" && node.max_pallet_height_m != null) {
+      const cur = levelMaxHeight.get(node.level) ?? 0;
+      if (node.max_pallet_height_m > cur) levelMaxHeight.set(node.level, node.max_pallet_height_m);
+    }
+  }
+
   const levelWeights: BalanceMetrics["levelWeights"] = [];
   for (const [level, ls] of levelStats) {
     const maxPerPos = levelMaxMass.get(level) ?? 1000;
@@ -296,6 +318,7 @@ export function computeBalanceMetrics(
       weightKg: ls.totalWeightKg,
       maxKg: maxPerPos * ls.total,
       maxPerPositionKg: maxPerPos,
+      maxHeightM: levelMaxHeight.get(level) ?? 0,
       fillPct: ls.occupied / Math.max(1, ls.total),
       count: ls.occupied,
     });

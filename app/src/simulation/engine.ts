@@ -60,45 +60,84 @@ const SKU_PALETTE = [
   "#006fa6", "#a30059", "#ffdbe5", "#7a4900", "#0000a6",
 ];
 
+/**
+ * Height classes based on level restrictions from the EVT map:
+ *   L1: max 1.83m → tall pallets (1.2-1.8m)
+ *   L2/L3: max 1.22m → medium pallets (0.6-1.2m)
+ *   L4: max 0.46m → short pallets (0.2-0.45m)
+ *
+ * Rule: taller = heavier. Height class determines both height and weight range.
+ */
+type HeightClassDef = {
+  heightClass: import("./types").HeightClass;
+  heightRange: [number, number]; // meters
+  weightRange: [number, number]; // kg
+};
+
+const HEIGHT_CLASSES: HeightClassDef[] = [
+  { heightClass: "tall",   heightRange: [1.2, 1.8],  weightRange: [700, 1200] },
+  { heightClass: "medium", heightRange: [0.6, 1.2],  weightRange: [350, 700] },
+  { heightClass: "short",  heightRange: [0.2, 0.45], weightRange: [100, 350] },
+];
+
 function generateSkuCatalog(count: number): SkuInfo[] {
   const skus: SkuInfo[] = [];
   const third = Math.max(1, Math.floor(count / 3));
+
   for (let i = 0; i < count; i++) {
-    let velocity: Velocity;
+    // Velocity: first third = high, second = medium, last = low
+    let velocity: import("./types").Velocity;
     if (i < third) velocity = "high";
     else if (i < third * 2) velocity = "medium";
     else velocity = "low";
 
-    let weightKg: number;
+    // Height class assignment:
+    // - High velocity: mix of tall (60%) and medium (40%) — heavy, frequent
+    // - Medium velocity: mix of all classes
+    // - Low velocity: 50% tall/heavy, 50% short/light
+    let hcDef: HeightClassDef;
     if (velocity === "high") {
-      weightKg = 600 + Math.random() * 400;
-    } else if (velocity === "low") {
-      weightKg = Math.random() < 0.5 ? 600 + Math.random() * 400 : 200 + Math.random() * 300;
+      hcDef = Math.random() < 0.6 ? HEIGHT_CLASSES[0] : HEIGHT_CLASSES[1];
+    } else if (velocity === "medium") {
+      const r = Math.random();
+      hcDef = r < 0.33 ? HEIGHT_CLASSES[0] : r < 0.66 ? HEIGHT_CLASSES[1] : HEIGHT_CLASSES[2];
     } else {
-      weightKg = 200 + Math.random() * 800;
+      hcDef = Math.random() < 0.5 ? HEIGHT_CLASSES[0] : HEIGHT_CLASSES[2];
     }
+
+    const [minH, maxH] = hcDef.heightRange;
+    const [minW, maxW] = hcDef.weightRange;
 
     skus.push({
       sku: `SKU-${String(i + 1).padStart(3, "0")}`,
       color: SKU_PALETTE[i % SKU_PALETTE.length],
-      weightKg,
-      heightM: 0.5 + Math.random() * 1.3,
+      weightKg: minW + Math.random() * (maxW - minW),
+      heightM: minH + Math.random() * (maxH - minH),
       velocity,
+      heightClass: hcDef.heightClass,
     });
   }
   return skus;
 }
 
+/**
+ * Pick a SKU for a new order.
+ * Priority by velocity class: 5:3:1 ratio (high:medium:low).
+ * Within each class, sorted by velocity priority then random.
+ */
 function pickSkuForOrder(catalog: SkuInfo[]): SkuInfo {
   const high = catalog.filter((s) => s.velocity === "high");
   const medium = catalog.filter((s) => s.velocity === "medium");
   const low = catalog.filter((s) => s.velocity === "low");
+
+  // 5:3:1 weighted sampling
   const r = Math.random() * 9;
   let pool: SkuInfo[];
   if (r < 5 && high.length > 0) pool = high;
   else if (r < 8 && medium.length > 0) pool = medium;
   else if (low.length > 0) pool = low;
   else pool = catalog;
+
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -334,7 +373,7 @@ function generateShiftTask(
   if (wantInduction) {
     const levelMaxMass = buildLevelMaxMass(graph);
     const targetId = selectInductionPosition(
-      graph, state, skuInfo.weightKg, levelMaxMass, pendingInductPositions, skuInfo.velocity,
+      graph, state, skuInfo.weightKg, skuInfo.heightM, levelMaxMass, pendingInductPositions, skuInfo.velocity,
     );
     if (targetId === null) {
       if (config.shiftMode === "mixed") {

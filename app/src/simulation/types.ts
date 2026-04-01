@@ -138,6 +138,7 @@ export type SimState = {
 };
 
 export type Velocity = "high" | "medium" | "low";
+export type HeightClass = "tall" | "medium" | "short";
 
 export type SkuInfo = {
   sku: string;
@@ -145,6 +146,7 @@ export type SkuInfo = {
   weightKg: number;
   heightM: number;
   velocity: Velocity;
+  heightClass: HeightClass;
 };
 
 export type EventLogEntry = {

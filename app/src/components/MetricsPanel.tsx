@@ -80,6 +80,8 @@ export function MetricsPanel({ height }: Props) {
           color: info?.color ?? "#888",
           velocity: info?.velocity ?? "medium",
           weightKg: info?.weightKg ?? 0,
+          heightM: info?.heightM ?? 0,
+          heightClass: info?.heightClass ?? "medium",
         };
       })
       .sort((a, b) => b.count - a.count);
@@ -263,6 +265,9 @@ export function MetricsPanel({ height }: Props) {
                     <span className="text-gray-500 tabular-nums w-20 text-right">
                       {Math.round(lw.weightKg)}kg/{Math.round(lw.maxPerPositionKg)}
                     </span>
+                    <span className="text-purple-400 tabular-nums text-[10px] w-12 text-right">
+                      ≤{lw.maxHeightM.toFixed(2)}m
+                    </span>
                     <span className="text-gray-500 tabular-nums w-8 text-right">
                       {lw.count}
                     </span>
@@ -345,7 +350,21 @@ export function MetricsPanel({ height }: Props) {
                   >
                     {s.velocity[0].toUpperCase()}
                   </span>
+                  <span
+                    className={`text-[9px] px-1 rounded font-medium ${
+                      s.heightClass === "tall"
+                        ? "bg-purple-900/60 text-purple-300"
+                        : s.heightClass === "medium"
+                          ? "bg-orange-900/60 text-orange-300"
+                          : "bg-green-900/60 text-green-300"
+                    }`}
+                  >
+                    {s.heightClass[0].toUpperCase()}
+                  </span>
                   <span className="text-gray-400 truncate flex-1">{s.sku}</span>
+                  <span className="text-gray-600 tabular-nums text-[10px]">
+                    {s.heightM.toFixed(2)}m
+                  </span>
                   <span className="text-gray-600 tabular-nums text-[10px]">
                     {Math.round(s.weightKg)}kg
                   </span>

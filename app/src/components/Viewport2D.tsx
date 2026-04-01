@@ -119,16 +119,20 @@ export function Viewport2D() {
       const y = node.position.y_m - node.size_y_m / 2;
       ctx.fillRect(x, y, node.size_x_m, node.size_y_m);
 
-      // Draw pallet on top if occupied
+      // Draw pallet on top if occupied — size scales with pallet height
       if (pallet) {
         const skuColor =
           simState?.skuCatalog.find((s) => s.sku === pallet.sku)?.color ??
           "#fff";
+        // Scale fill from 0.4 (short ~0.2m) to 0.9 (tall ~1.8m)
+        const hFrac = Math.min(1, Math.max(0, (pallet.heightM - 0.2) / 1.6));
+        const fillScale = 0.4 + hFrac * 0.5;
         ctx.globalAlpha = 0.9;
         ctx.fillStyle = skuColor;
-        const px = node.position.x_m - node.size_x_m * 0.35;
-        const py = node.position.y_m - node.size_y_m * 0.35;
-        ctx.fillRect(px, py, node.size_x_m * 0.7, node.size_y_m * 0.7);
+        const half = fillScale / 2;
+        const px = node.position.x_m - node.size_x_m * half;
+        const py = node.position.y_m - node.size_y_m * half;
+        ctx.fillRect(px, py, node.size_x_m * fillScale, node.size_y_m * fillScale);
       }
 
       // Selection highlight

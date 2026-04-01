@@ -135,9 +135,10 @@ function PalletInstances() {
 
     for (let i = 0; i < palletEntries.length; i++) {
       const { node, pallet } = palletEntries[i];
-      const yOffset = (node.level - 1) * LEVEL_HEIGHT + 0.25;
+      const palletH = pallet.heightM ?? 0.35;
+      const yOffset = (node.level - 1) * LEVEL_HEIGHT + palletH / 2;
       dummy.position.set(node.position.x_m, yOffset, node.position.y_m);
-      dummy.scale.set(node.size_x_m * 0.85, 0.35, node.size_y_m * 0.85);
+      dummy.scale.set(node.size_x_m * 0.85, palletH, node.size_y_m * 0.85);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
 
