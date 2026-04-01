@@ -203,6 +203,9 @@ function shouldWaitForCollision(
 ): boolean {
   if (config.algorithm === "no-collision") return false;
 
+  // CA* paths are already deconflicted — no runtime collision check needed
+  if (config.algorithm === "cooperative-astar") return false;
+
   const occupyingBotId = botPositions.get(nextNodeId);
   if (occupyingBotId === undefined || occupyingBotId === bot.id) return false;
 
