@@ -9,3 +9,6 @@ app/.vite/
 # WASM build output
 app/public/pathfinder.wasm
 app/public/wasm_exec.js
+
+# Local Go install
+.local/
