@@ -21,9 +21,17 @@ export function Controls() {
   const graph = useStore((s) => s.graph);
   const graphData = useStore((s) => s.graphData);
   const config = useStore((s) => s.config);
+  const history = useStore((s) => s.history);
+  const scrubIndex = useStore((s) => s.scrubIndex);
+  const setScrubIndex = useStore((s) => s.setScrubIndex);
 
   const wasmReady = useRef(false);
   const animRef = useRef<number>(0);
+
+  // The state to display: either scrubbed history frame or live state
+  const displayState = scrubIndex !== null && history[scrubIndex]
+    ? history[scrubIndex]
+    : simState;
 
   // Initialize WASM + simulation
   const handleInit = useCallback(async () => {
@@ -34,6 +42,8 @@ export function Controls() {
       wasmReady.current = true;
       const initial = createInitialState(graph, config);
       setSimState(initial);
+      useStore.getState().clearHistory();
+      useStore.getState().pushHistory(initial);
     } catch (e) {
       console.error("Failed to init simulation:", e);
     }
@@ -49,9 +59,14 @@ export function Controls() {
   // Step once
   const doStep = useCallback(() => {
     if (!graph || !simState || !wasmReady.current) return;
+    // If scrubbing, exit scrub mode first
+    if (scrubIndex !== null) {
+      setScrubIndex(null);
+    }
     const next = stepSimulation(graph, simState, config);
     setSimState(next);
-  }, [graph, simState, config, setSimState]);
+    useStore.getState().pushHistory(next);
+  }, [graph, simState, config, setSimState, scrubIndex, setScrubIndex]);
 
   // Play loop
   useEffect(() => {
@@ -60,8 +75,13 @@ export function Controls() {
       return;
     }
 
+    // Exit scrub mode when playing
+    const s0 = useStore.getState();
+    if (s0.scrubIndex !== null) {
+      s0.setScrubIndex(null);
+    }
+
     let lastTime = 0;
-    // Base tick = 500ms (2 ticks/sec). Speed multiplier makes it faster.
     const interval = speed === 0 ? 0 : 500 / speed;
 
     const tick = (time: number) => {
@@ -75,6 +95,7 @@ export function Controls() {
           }
           const next = stepSimulation(s.graph, s.simState, s.config);
           s.setSimState(next);
+          s.pushHistory(next);
         }
       }
       animRef.current = requestAnimationFrame(tick);
@@ -87,83 +108,143 @@ export function Controls() {
   // Reset
   const handleReset = useCallback(() => {
     setPlaying(false);
+    setScrubIndex(null);
     if (graph) {
       const initial = createInitialState(graph, config);
       setSimState(initial);
+      useStore.getState().clearHistory();
+      useStore.getState().pushHistory(initial);
     }
-  }, [graph, config, setPlaying, setSimState]);
+  }, [graph, config, setPlaying, setSimState, setScrubIndex]);
+
+  // Scrubber handlers
+  const handleScrub = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const idx = Number(e.target.value);
+      setScrubIndex(idx);
+    },
+    [setScrubIndex],
+  );
+
+  const handleScrubEnd = useCallback(() => {
+    // Stay in scrub mode — user can hit Play to resume from live state
+  }, []);
+
+  const goToLive = useCallback(() => {
+    setScrubIndex(null);
+  }, [setScrubIndex]);
+
+  const currentStep = displayState?.step ?? 0;
+  const isScrubbing = scrubIndex !== null;
 
   return (
-    <div className="flex items-center gap-2 bg-gray-800/90 backdrop-blur rounded-lg px-4 py-2 border border-gray-700">
-      {/* Transport */}
-      <button
-        className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 transition-colors"
-        onClick={() => setPlaying(!playing)}
-      >
-        {playing ? "Pause" : "Play"}
-      </button>
-      <button
-        className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 transition-colors"
-        onClick={doStep}
-        title="Step one timestep"
-      >
-        Step
-      </button>
-      <button
-        className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 transition-colors"
-        onClick={handleReset}
-      >
-        Reset
-      </button>
+    <div className="flex flex-col gap-1.5">
+      {/* Scrubber bar */}
+      {history.length > 1 && (
+        <div className="flex items-center gap-2 bg-gray-800/90 backdrop-blur rounded-lg px-4 py-1.5 border border-gray-700">
+          <span className="text-[10px] text-gray-500 w-6 tabular-nums">0</span>
+          <input
+            type="range"
+            className="flex-1 accent-cyan-500 h-1.5"
+            min={0}
+            max={history.length - 1}
+            value={scrubIndex ?? history.length - 1}
+            onChange={handleScrub}
+            onMouseUp={handleScrubEnd}
+          />
+          <span className="text-[10px] text-gray-500 w-12 tabular-nums text-right">
+            {history.length - 1}
+          </span>
+          {isScrubbing && (
+            <button
+              className="px-2 py-0.5 rounded text-[10px] font-medium bg-cyan-700 text-white hover:bg-cyan-600"
+              onClick={goToLive}
+            >
+              Live
+            </button>
+          )}
+        </div>
+      )}
 
-      <div className="w-px h-6 bg-gray-600" />
+      {/* Transport controls */}
+      <div className="flex items-center gap-2 bg-gray-800/90 backdrop-blur rounded-lg px-4 py-2 border border-gray-700">
+        <button
+          className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 transition-colors"
+          onClick={() => {
+            if (isScrubbing) setScrubIndex(null);
+            setPlaying(!playing);
+          }}
+        >
+          {playing ? "Pause" : "Play"}
+        </button>
+        <button
+          className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 transition-colors"
+          onClick={doStep}
+          title="Step one timestep"
+        >
+          Step
+        </button>
+        <button
+          className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 transition-colors"
+          onClick={handleReset}
+        >
+          Reset
+        </button>
 
-      {/* Speed */}
-      <div className="flex items-center gap-1">
-        <span className="text-xs text-gray-400">Speed:</span>
-        {SPEEDS.map((s) => (
-          <button
-            key={s}
-            className={`px-2 py-0.5 rounded text-xs ${
-              speed === s
-                ? "bg-cyan-600 text-white"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-            }`}
-            onClick={() => setSpeed(s)}
-          >
-            {s === 0 ? "Max" : `${s}x`}
-          </button>
-        ))}
+        <div className="w-px h-6 bg-gray-600" />
+
+        {/* Speed */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400">Speed:</span>
+          {SPEEDS.map((s) => (
+            <button
+              key={s}
+              className={`px-2 py-0.5 rounded text-xs ${
+                speed === s
+                  ? "bg-cyan-600 text-white"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
+              onClick={() => setSpeed(s)}
+            >
+              {s === 0 ? "Max" : `${s}x`}
+            </button>
+          ))}
+        </div>
+
+        <div className="w-px h-6 bg-gray-600" />
+
+        <ViewButtons />
+
+        <div className="w-px h-6 bg-gray-600" />
+
+        {/* Batch run (records all frames to history) */}
+        <button
+          className="px-3 py-1 rounded text-xs font-medium bg-cyan-700 hover:bg-cyan-600 transition-colors"
+          onClick={() => {
+            if (!graph || !simState || !wasmReady.current) return;
+            if (isScrubbing) setScrubIndex(null);
+            let s = simState;
+            for (let i = 0; i < 100; i++) {
+              if (s.shiftDone) break;
+              s = stepSimulation(graph, s, config);
+              useStore.getState().pushHistory(s);
+            }
+            setSimState(s);
+          }}
+        >
+          Run 100
+        </button>
+
+        <div className="w-px h-6 bg-gray-600" />
+
+        {/* Step counter */}
+        <span className="text-xs text-gray-400 tabular-nums">
+          {isScrubbing && (
+            <span className="text-amber-400 mr-1">SCRUB</span>
+          )}
+          Step: {currentStep}
+        </span>
       </div>
-
-      <div className="w-px h-6 bg-gray-600" />
-
-      {/* View mode */}
-      <ViewButtons />
-
-      <div className="w-px h-6 bg-gray-600" />
-
-      {/* Batch run */}
-      <button
-        className="px-3 py-1 rounded text-xs font-medium bg-cyan-700 hover:bg-cyan-600 transition-colors"
-        onClick={() => {
-          if (!graph || !simState || !wasmReady.current) return;
-          let s = simState;
-          for (let i = 0; i < 100; i++) {
-            s = stepSimulation(graph, s, config);
-          }
-          setSimState(s);
-        }}
-      >
-        Run 100
-      </button>
-
-      <div className="w-px h-6 bg-gray-600" />
-
-      {/* Step counter */}
-      <span className="text-xs text-gray-400 tabular-nums">
-        Step: {simState?.step ?? 0}
-      </span>
     </div>
   );
 }

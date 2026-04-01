@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useStore } from "../store";
+import { useDisplayState } from "../hooks/useDisplayState";
 import type { GraphNode, NodeKind } from "../graph/types";
 import { KIND_HEX } from "../graph/types";
 
@@ -32,7 +33,7 @@ const BOT_COLORS = [
 
 export function WarehouseScene() {
   const graph = useStore((s) => s.graph);
-  const simState = useStore((s) => s.simState);
+  const simState = useDisplayState();
   const setSelectedNodeId = useStore((s) => s.setSelectedNodeId);
 
   const nodesByKind = useMemo(() => {
@@ -105,7 +106,7 @@ export function WarehouseScene() {
 
 function PalletInstances() {
   const graph = useStore((s) => s.graph);
-  const simState = useStore((s) => s.simState);
+  const simState = useDisplayState();
   const meshRef = useRef<THREE.InstancedMesh>(null!);
   const colorRef = useRef<THREE.InstancedBufferAttribute | null>(null);
 
@@ -174,7 +175,7 @@ function PalletInstances() {
 
 function BotMeshes() {
   const graph = useStore((s) => s.graph);
-  const simState = useStore((s) => s.simState);
+  const simState = useDisplayState();
   const groupRef = useRef<THREE.Group>(null!);
   const botRefs = useRef<Map<number, THREE.Mesh>>(new Map());
   const carryRefs = useRef<Map<number, THREE.Mesh>>(new Map());

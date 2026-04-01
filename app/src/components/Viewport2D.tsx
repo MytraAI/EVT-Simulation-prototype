@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useStore } from "../store";
+import { useDisplayState } from "../hooks/useDisplayState";
 import type { NodeKind } from "../graph/types";
 import { KIND_COLORS } from "../graph/types";
 
@@ -23,7 +24,7 @@ export function Viewport2D() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const graph = useStore((s) => s.graph);
-  const simState = useStore((s) => s.simState);
+  const simState = useDisplayState();
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const setSelectedNodeId = useStore((s) => s.setSelectedNodeId);
   const viewLevel = useStore((s) => s.viewLevel);

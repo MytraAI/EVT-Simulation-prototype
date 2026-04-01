@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useStore } from "../store";
+import { useDisplayState } from "../hooks/useDisplayState";
 import { computeHealthMetrics } from "../metrics/health";
 import { buildLevelMaxMass, computeBalanceMetrics } from "../simulation/position-selector";
 
@@ -8,7 +9,7 @@ type Props = {
 };
 
 export function MetricsPanel({ height }: Props) {
-  const simState = useStore((s) => s.simState);
+  const simState = useDisplayState();
   const graph = useStore((s) => s.graph);
 
   const health = useMemo(() => {

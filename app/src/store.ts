@@ -16,7 +16,6 @@ type Store = {
   cameraMode: CameraMode;
   setCameraMode: (mode: CameraMode) => void;
 
-  // 2D level filter (0 = all levels)
   viewLevel: number;
   setViewLevel: (level: number) => void;
 
@@ -31,6 +30,13 @@ type Store = {
   setPlaying: (playing: boolean) => void;
   setSpeed: (speed: SimSpeed) => void;
 
+  // Playback history
+  history: SimState[];
+  pushHistory: (state: SimState) => void;
+  clearHistory: () => void;
+  scrubIndex: number | null; // null = live, number = viewing history frame
+  setScrubIndex: (index: number | null) => void;
+
   metricsPanelHeight: number;
   setMetricsPanelHeight: (h: number) => void;
 
@@ -38,11 +44,14 @@ type Store = {
   setSelectedNodeId: (id: string | null) => void;
 };
 
+// Max frames to keep in history (~10 min at 1x = 1200 frames)
+const MAX_HISTORY = 5000;
+
 export const useStore = create<Store>((set) => ({
   graphData: null,
   graph: null,
   setGraphData: (data) =>
-    set({ graphData: data, graph: loadGraph(data), simState: null }),
+    set({ graphData: data, graph: loadGraph(data), simState: null, history: [], scrubIndex: null }),
 
   cameraMode: "3d",
   setCameraMode: (mode) => set({ cameraMode: mode }),
@@ -61,6 +70,18 @@ export const useStore = create<Store>((set) => ({
   speed: 1,
   setPlaying: (playing) => set({ playing }),
   setSpeed: (speed) => set({ speed }),
+
+  history: [],
+  pushHistory: (state) =>
+    set((s) => {
+      const h = s.history.length >= MAX_HISTORY
+        ? [...s.history.slice(s.history.length - MAX_HISTORY + 1), state]
+        : [...s.history, state];
+      return { history: h };
+    }),
+  clearHistory: () => set({ history: [], scrubIndex: null }),
+  scrubIndex: null,
+  setScrubIndex: (index) => set({ scrubIndex: index }),
 
   metricsPanelHeight: 320,
   setMetricsPanelHeight: (h) => set({ metricsPanelHeight: h }),
