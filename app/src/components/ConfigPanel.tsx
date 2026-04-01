@@ -180,6 +180,29 @@ export function ConfigPanel() {
           step={1}
           onChange={set("botCount")}
         />
+        <label className="block mb-2">
+          <span className="text-xs text-gray-400">Algorithm</span>
+          <select
+            className="w-full mt-0.5 bg-gray-700 text-gray-200 text-xs rounded px-2 py-1.5 border border-gray-600"
+            value={config.algorithm}
+            onChange={(e) => updateConfig({ algorithm: e.target.value as any })}
+          >
+            <option value="no-collision">No Collision (baseline estimate)</option>
+            <option value="soft-collision">Soft Collision (wait then phase through)</option>
+            <option value="strict">Strict (requires MAPF / Director)</option>
+          </select>
+        </label>
+        {config.algorithm === "soft-collision" && (
+          <Slider
+            label="Max collision wait"
+            value={config.softCollisionWaitTicks}
+            min={1}
+            max={30}
+            step={1}
+            unit=" ticks"
+            onChange={set("softCollisionWaitTicks")}
+          />
+        )}
       </div>
 
       {/* Station & Position times */}

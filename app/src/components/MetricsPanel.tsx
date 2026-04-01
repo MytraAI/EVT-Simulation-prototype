@@ -217,6 +217,11 @@ export function MetricsPanel({ height }: Props) {
             value={`${(avgUtilization * 100).toFixed(0)}%`}
             accent={avgUtilization > 0.7 ? "green" : avgUtilization > 0.3 ? "yellow" : "red"}
           />
+          <StatCard
+            label="Collisions"
+            value={bots.reduce((s, b) => s + b.totalCollisionWaitSteps, 0)}
+            accent={bots.reduce((s, b) => s + b.totalCollisionWaitSteps, 0) > 50 ? "red" : undefined}
+          />
           <StatCard label="Pending" value={pendingTasks} accent={pendingTasks > 5 ? "red" : undefined} />
           <StatCard label="Active" value={activeTasks} accent="green" />
           {balance && (

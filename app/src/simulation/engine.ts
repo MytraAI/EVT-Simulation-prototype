@@ -151,19 +151,29 @@ function edgeTravelTicks(
 }
 
 /**
- * Check if a node is occupied by another bot that is in an edge-wait state
- * (i.e. doing a slow Z traversal). Other bots must wait for it to finish.
+ * Check if a bot should wait at its current node due to collision.
+ * Returns true if the bot should NOT move this tick.
+ *
+ * - "no-collision": never blocked, bots share nodes freely
+ * - "soft-collision": blocked up to softCollisionWaitTicks, then phases through
+ * - "strict": always blocked (requires MAPF solver like Director)
  */
-function isNodeBlockedByBot(
-  nodeId: string,
-  botId: number,
+function shouldWaitForCollision(
+  nextNodeId: string,
+  bot: Bot,
   botPositions: Map<string, number>,
-  bots: Bot[],
+  config: SimConfig,
 ): boolean {
-  const occupyingBotId = botPositions.get(nodeId);
-  if (occupyingBotId === undefined || occupyingBotId === botId) return false;
-  // The node is occupied by another bot — block
-  return true;
+  if (config.algorithm === "no-collision") return false;
+
+  const occupyingBotId = botPositions.get(nextNodeId);
+  if (occupyingBotId === undefined || occupyingBotId === bot.id) return false;
+
+  // Node is occupied by another bot
+  if (config.algorithm === "strict") return true;
+
+  // soft-collision: wait up to N ticks, then phase through
+  return bot.collisionWaitTicks < config.softCollisionWaitTicks;
 }
 
 // ─── State creation ───
@@ -195,8 +205,10 @@ export function createInitialState(
       stepsRemaining: 0,
       moveProgress: 1,
       edgeWaitTicks: 0,
+      collisionWaitTicks: 0,
       totalIdleSteps: 0,
       totalBusySteps: 0,
+      totalCollisionWaitSteps: 0,
       tasksCompleted: 0,
       totalDistanceM: 0,
     });
@@ -337,35 +349,35 @@ function tryRetrieve(
 
 /**
  * Attempt to move bot one node along path. Returns true if arrived at end.
- * If next node is blocked by another bot, the bot waits (returns false, no move).
+ * Collision handling depends on config.algorithm.
  */
 function moveBotAlongPath(
   bot: Bot,
   graph: WarehouseGraph,
   config: SimConfig,
   botPositions: Map<string, number>,
-  allBots: Bot[],
 ): boolean {
   if (bot.pathIndex >= bot.path.length - 1) return true;
 
   const nextNodeId = bot.path[bot.pathIndex + 1];
 
-  // Check if next node is blocked by another bot
-  if (isNodeBlockedByBot(nextNodeId, bot.id, botPositions, allBots)) {
-    // Wait — don't move this tick
-    return false;
+  // Check collision
+  if (shouldWaitForCollision(nextNodeId, bot, botPositions, config)) {
+    bot.collisionWaitTicks++;
+    bot.totalCollisionWaitSteps++;
+    return false; // wait this tick
   }
 
-  // Calculate how many ticks this edge takes
+  // Moving — reset collision counter
+  bot.collisionWaitTicks = 0;
+
   const ticks = edgeTravelTicks(bot.currentNodeId, nextNodeId, graph, config);
 
-  // Move to next node
   bot.prevNodeId = bot.currentNodeId;
   bot.pathIndex++;
   bot.currentNodeId = bot.path[bot.pathIndex];
   bot.moveProgress = 0;
 
-  // If edge takes more than 1 tick, set wait
   if (ticks > 1) {
     bot.edgeWaitTicks = ticks - 1;
   }
@@ -495,7 +507,7 @@ export function stepSimulation(
       case "TRAVELING_TO_PICKUP": {
         b.totalBusySteps++;
         botPositions.delete(b.currentNodeId);
-        const arrived = moveBotAlongPath(b, graph, config, botPositions, state.bots);
+        const arrived = moveBotAlongPath(b, graph, config, botPositions);
         botPositions.set(b.currentNodeId, b.id);
 
         if (b.edgeWaitTicks > 0) {
@@ -538,7 +550,7 @@ export function stepSimulation(
       case "TRAVELING_TO_DROPOFF": {
         b.totalBusySteps++;
         botPositions.delete(b.currentNodeId);
-        const arrived = moveBotAlongPath(b, graph, config, botPositions, state.bots);
+        const arrived = moveBotAlongPath(b, graph, config, botPositions);
         botPositions.set(b.currentNodeId, b.id);
 
         if (b.edgeWaitTicks > 0) {

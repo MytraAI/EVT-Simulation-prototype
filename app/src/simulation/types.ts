@@ -1,22 +1,30 @@
 export type ShiftMode = "fill-drain" | "mixed" | "pure-induct" | "pure-retrieve";
 
+// Pathfinding / collision algorithm
+// - "no-collision": bots ignore each other, no blocking. Fast baseline estimate.
+// - "soft-collision": bots wait up to N ticks when blocked, then phase through. Realistic-ish.
+// - "strict": full blocking, bots wait forever. Requires MAPF solver (Director) to avoid deadlocks.
+export type Algorithm = "no-collision" | "soft-collision" | "strict";
+
 export type SimConfig = {
   botCount: number;
+  algorithm: Algorithm;
+  softCollisionWaitTicks: number; // max ticks to wait before phasing through (soft-collision mode)
 
   // Bot movement
-  botSpeedMps: number;        // horizontal travel speed (m/s)
-  zUpSpeedMps: number;        // vertical up speed (m/s) — typically much slower
-  zDownSpeedMps: number;      // vertical down speed (m/s)
-  xyTurnTimeS: number;        // time to turn within XY plane (seconds)
-  xyzTransitionTimeS: number; // time to transition between XY and Z movement (seconds)
+  botSpeedMps: number;
+  zUpSpeedMps: number;
+  zDownSpeedMps: number;
+  xyTurnTimeS: number;
+  xyzTransitionTimeS: number;
 
-  // Station times (at the operator station)
-  stationPickTimeS: number;   // operator loads pallet onto bot (induction start)
-  stationDropTimeS: number;   // operator unloads pallet from bot (retrieval end)
+  // Station times
+  stationPickTimeS: number;
+  stationDropTimeS: number;
 
-  // Position times (at the pallet rack position)
-  positionPickTimeS: number;  // bot picks pallet from rack (retrieval start)
-  positionDropTimeS: number;  // bot places pallet into rack (induction end)
+  // Position times
+  positionPickTimeS: number;
+  positionDropTimeS: number;
 
   initialFillPct: number;
   skuCount: number;
@@ -31,11 +39,13 @@ export type SimConfig = {
 
 export const DEFAULT_CONFIG: SimConfig = {
   botCount: 5,
-  botSpeedMps: 1.0,        // 1 m/s horizontal
-  zUpSpeedMps: 0.1,         // 0.1 m/s going up (10x slower than horizontal)
-  zDownSpeedMps: 0.5,       // 0.5 m/s going down (2x slower than horizontal)
-  xyTurnTimeS: 2,           // 2 seconds to turn in XY
-  xyzTransitionTimeS: 3,    // 3 seconds to switch between XY and Z
+  algorithm: "soft-collision",
+  softCollisionWaitTicks: 5,
+  botSpeedMps: 1.0,
+  zUpSpeedMps: 0.1,
+  zDownSpeedMps: 0.5,
+  xyTurnTimeS: 2,
+  xyzTransitionTimeS: 3,
   stationPickTimeS: 8,
   stationDropTimeS: 6,
   positionPickTimeS: 4,
@@ -64,11 +74,13 @@ export type Bot = {
   path: string[];
   pathIndex: number;
   task: Task | null;
-  stepsRemaining: number;   // ticks left for current operation (pick/place/edge)
-  moveProgress: number;     // 0-1 for rendering interpolation
-  edgeWaitTicks: number;    // remaining ticks for current edge traversal
+  stepsRemaining: number;
+  moveProgress: number;
+  edgeWaitTicks: number;
+  collisionWaitTicks: number; // ticks spent waiting for another bot (soft-collision)
   totalIdleSteps: number;
   totalBusySteps: number;
+  totalCollisionWaitSteps: number;
   tasksCompleted: number;
   totalDistanceM: number;
 };
