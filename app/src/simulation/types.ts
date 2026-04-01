@@ -4,7 +4,8 @@ export type ShiftMode = "fill-drain" | "mixed" | "pure-induct" | "pure-retrieve"
 // - "no-collision": bots ignore each other, no blocking. Fast baseline estimate.
 // - "soft-collision": bots wait up to N ticks when blocked, then phase through. Realistic-ish.
 // - "strict": full blocking, bots wait forever. Requires MAPF solver (Director) to avoid deadlocks.
-export type Algorithm = "no-collision" | "soft-collision" | "strict";
+// - "cooperative-astar": Cooperative A* with space-time reservations. Basic MAPF.
+export type Algorithm = "no-collision" | "soft-collision" | "cooperative-astar" | "strict";
 
 export type SimConfig = {
   botCount: number;

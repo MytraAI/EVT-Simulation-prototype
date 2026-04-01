@@ -11,6 +11,7 @@ import type {
 } from "./types";
 import { findPath, findPathBlocked } from "./wasm-bridge";
 import { buildLevelMaxMass, selectInductionPosition } from "./position-selector";
+import { cooperativePathPlan } from "./mapf";
 
 /**
  * Compute nodes that are blocked for pallet-carrying bots.
@@ -472,6 +473,38 @@ export function stepSimulation(
     shiftDone = true;
   }
 
+  // ─── Cooperative A* replanning ───
+  // For CA* mode, replan all traveling bots cooperatively every tick.
+  // This gives each bot a conflict-free path through space-time.
+  let caStarPlans: Map<number, string[]> | null = null;
+  if (config.algorithm === "cooperative-astar") {
+    const palletOcclusions = new Set(computeBlockedNodesForCarrying(graph, pallets));
+
+    caStarPlans = cooperativePathPlan(
+      state.bots,
+      graph,
+      config,
+      newStep,
+      palletOcclusions,
+      (bot) => {
+        if (!bot.task) return null;
+        if (bot.state === "TRAVELING_TO_PICKUP" || bot.state === "EDGE_WAIT") {
+          return bot.task.type === "INDUCTION"
+            ? bot.task.stationNodeId
+            : bot.task.positionNodeId;
+        }
+        if (bot.state === "TRAVELING_TO_DROPOFF" || bot.state === "EDGE_WAIT_DROP") {
+          return bot.task.type === "INDUCTION"
+            ? bot.task.positionNodeId
+            : bot.task.stationNodeId;
+        }
+        return null;
+      },
+      (bot) =>
+        bot.state === "TRAVELING_TO_DROPOFF" || bot.state === "EDGE_WAIT_DROP",
+    );
+  }
+
   // Update each bot
   const updatedBots = state.bots.map((bot) => {
     const b = { ...bot };
@@ -523,8 +556,12 @@ export function stepSimulation(
             ? unassigned.stationNodeId
             : unassigned.positionNodeId;
 
-          // Not carrying yet — use normal pathfinding
-          const pathResult = findPathForBot(b.currentNodeId, pickupTarget, false, graph, pallets);
+          // Use CA* plan if available, otherwise fall back to Dijkstra
+          const caPath = caStarPlans?.get(b.id);
+          const pathResult = caPath
+            ? { path: caPath, totalCost: 0 }
+            : findPathForBot(b.currentNodeId, pickupTarget, false, graph, pallets);
+
           if (pathResult) {
             b.path = pathResult.path;
             b.pathIndex = 0;
@@ -543,6 +580,12 @@ export function stepSimulation(
 
       case "TRAVELING_TO_PICKUP": {
         b.totalBusySteps++;
+        // CA* may have replanned our path — adopt it
+        const caPickupPath = caStarPlans?.get(b.id);
+        if (caPickupPath && caPickupPath.length > 1) {
+          b.path = caPickupPath;
+          b.pathIndex = 0;
+        }
         botPositions.delete(b.currentNodeId);
         const arrived = moveBotAlongPath(b, graph, config, botPositions);
         botPositions.set(b.currentNodeId, b.id);
@@ -569,8 +612,11 @@ export function stepSimulation(
             ? b.task.positionNodeId
             : b.task.stationNodeId;
 
-          // Carrying pallet — use blocked pathfinding to avoid occluded nodes
-          const pathResult = findPathForBot(b.currentNodeId, dropoffTarget, true, graph, pallets);
+          // Use CA* plan if available, otherwise Dijkstra with pallet blocking
+          const caPath = caStarPlans?.get(b.id);
+          const pathResult = caPath
+            ? { path: caPath, totalCost: 0 }
+            : findPathForBot(b.currentNodeId, dropoffTarget, true, graph, pallets);
           if (pathResult) {
             b.path = pathResult.path;
             b.pathIndex = 0;
@@ -586,6 +632,11 @@ export function stepSimulation(
 
       case "TRAVELING_TO_DROPOFF": {
         b.totalBusySteps++;
+        const caDropPath = caStarPlans?.get(b.id);
+        if (caDropPath && caDropPath.length > 1) {
+          b.path = caDropPath;
+          b.pathIndex = 0;
+        }
         botPositions.delete(b.currentNodeId);
         const arrived = moveBotAlongPath(b, graph, config, botPositions);
         botPositions.set(b.currentNodeId, b.id);

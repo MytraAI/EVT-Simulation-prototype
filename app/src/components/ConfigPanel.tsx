@@ -197,7 +197,8 @@ export function ConfigPanel() {
           >
             <option value="no-collision">No Collision (baseline estimate)</option>
             <option value="soft-collision">Soft Collision (wait then phase through)</option>
-            <option value="strict">Strict (requires MAPF / Director)</option>
+            <option value="cooperative-astar">Cooperative A* (basic MAPF)</option>
+            <option value="strict">Strict (requires Director)</option>
           </select>
         </label>
         {config.algorithm === "soft-collision" && (
