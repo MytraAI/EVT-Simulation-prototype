@@ -124,30 +124,66 @@ function computePathDistanceM(path: string[], graph: WarehouseGraph): number {
  * Z-down: distance / zDownSpeedMps
  * All rounded up, minimum 1 tick.
  */
-function edgeTravelTicks(
-  fromId: string,
-  toId: string,
-  graph: WarehouseGraph,
-  config: SimConfig,
-): number {
-  const edge = graph.data.edges.find(
+/**
+ * Find the edge between two nodes and return it.
+ */
+function findEdge(graph: WarehouseGraph, fromId: string, toId: string) {
+  return graph.data.edges.find(
     (e) =>
       (e.a === fromId && e.b === toId) ||
       (e.b === fromId && e.a === toId),
   );
+}
+
+/**
+ * Compute ticks to traverse an edge, including turn/transition penalties.
+ *
+ * Travel time = distance / speed (based on axis)
+ * Turn time added when axis changes between consecutive edges:
+ *   - XY→XY turn (x↔y): xyTurnTimeS
+ *   - XY↔Z transition: xyzTransitionTimeS
+ */
+function edgeTravelTicks(
+  fromId: string,
+  toId: string,
+  prevAxis: string | null, // axis of the previous edge (null if first move)
+  graph: WarehouseGraph,
+  config: SimConfig,
+): number {
+  const edge = findEdge(graph, fromId, toId);
   if (!edge) return 1;
 
+  // Base travel time from distance and speed
+  let travelSeconds: number;
   if (edge.axis === "z") {
     const fromNode = graph.nodeMap.get(fromId);
     const toNode = graph.nodeMap.get(toId);
     if (fromNode && toNode) {
       const goingUp = toNode.position.z_m > fromNode.position.z_m;
       const speed = goingUp ? config.zUpSpeedMps : config.zDownSpeedMps;
-      return Math.max(1, Math.ceil(edge.distance_m / speed));
+      travelSeconds = edge.distance_m / speed;
+    } else {
+      travelSeconds = edge.distance_m / config.botSpeedMps;
+    }
+  } else {
+    travelSeconds = edge.distance_m / config.botSpeedMps;
+  }
+
+  // Add turn penalty if axis changed
+  let turnSeconds = 0;
+  if (prevAxis !== null && prevAxis !== edge.axis) {
+    const prevIsXY = prevAxis === "x" || prevAxis === "y";
+    const curIsXY = edge.axis === "x" || edge.axis === "y";
+    if (prevIsXY && curIsXY) {
+      // XY turn (e.g. x→y)
+      turnSeconds = config.xyTurnTimeS;
+    } else {
+      // XY↔Z transition
+      turnSeconds = config.xyzTransitionTimeS;
     }
   }
 
-  return Math.max(1, Math.ceil(edge.distance_m / config.botSpeedMps));
+  return Math.max(1, Math.ceil(travelSeconds + turnSeconds));
 }
 
 /**
@@ -365,13 +401,19 @@ function moveBotAlongPath(
   if (shouldWaitForCollision(nextNodeId, bot, botPositions, config)) {
     bot.collisionWaitTicks++;
     bot.totalCollisionWaitSteps++;
-    return false; // wait this tick
+    return false;
   }
 
-  // Moving — reset collision counter
   bot.collisionWaitTicks = 0;
 
-  const ticks = edgeTravelTicks(bot.currentNodeId, nextNodeId, graph, config);
+  // Determine previous edge axis for turn detection
+  let prevAxis: string | null = null;
+  if (bot.pathIndex > 0) {
+    const prevEdge = findEdge(graph, bot.path[bot.pathIndex - 1], bot.currentNodeId);
+    if (prevEdge) prevAxis = prevEdge.axis;
+  }
+
+  const ticks = edgeTravelTicks(bot.currentNodeId, nextNodeId, prevAxis, graph, config);
 
   bot.prevNodeId = bot.currentNodeId;
   bot.pathIndex++;
@@ -382,12 +424,7 @@ function moveBotAlongPath(
     bot.edgeWaitTicks = ticks - 1;
   }
 
-  // Track actual distance
-  const edge = graph.data.edges.find(
-    (e) =>
-      (e.a === bot.prevNodeId && e.b === bot.currentNodeId) ||
-      (e.b === bot.prevNodeId && e.a === bot.currentNodeId),
-  );
+  const edge = findEdge(graph, bot.prevNodeId, bot.currentNodeId);
   if (edge) bot.totalDistanceM += edge.distance_m;
 
   return bot.pathIndex >= bot.path.length - 1;
