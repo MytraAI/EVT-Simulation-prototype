@@ -9,8 +9,46 @@ import type {
   EventLogEntry,
   Velocity,
 } from "./types";
-import { findPath } from "./wasm-bridge";
+import { findPath, findPathBlocked } from "./wasm-bridge";
 import { buildLevelMaxMass, selectInductionPosition } from "./position-selector";
+
+/**
+ * Compute nodes that are blocked for pallet-carrying bots.
+ * When a pallet occupies a position, its bot_occupancy_occlusions
+ * list nodes that a carrying bot cannot traverse.
+ */
+function computeBlockedNodesForCarrying(
+  graph: WarehouseGraph,
+  pallets: Map<string, unknown>,
+): string[] {
+  const blocked = new Set<string>();
+  for (const [posId] of pallets) {
+    const node = graph.nodeMap.get(posId);
+    if (!node) continue;
+    const occlusions = node.computed?.bot_occupancy_occlusions ?? [];
+    for (const occId of occlusions) {
+      blocked.add(occId);
+    }
+  }
+  return Array.from(blocked);
+}
+
+/**
+ * Find a path, using blocked pathfinding if the bot is/will be carrying a pallet.
+ */
+function findPathForBot(
+  fromId: string,
+  toId: string,
+  isCarrying: boolean,
+  graph: WarehouseGraph,
+  pallets: Map<string, unknown>,
+): { totalCost: number; path: string[] } | null {
+  if (isCarrying) {
+    const blocked = computeBlockedNodesForCarrying(graph, pallets);
+    return findPathBlocked(fromId, toId, blocked);
+  }
+  return findPath(fromId, toId);
+}
 
 const SKU_PALETTE = [
   "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
@@ -21,32 +59,22 @@ const SKU_PALETTE = [
   "#006fa6", "#a30059", "#ffdbe5", "#7a4900", "#0000a6",
 ];
 
-// SKU velocity split among catalog items (roughly even thirds)
-// But ORDER frequency is 5:3:1 (high:medium:low) — see pickSkuForOrder()
 function generateSkuCatalog(count: number): SkuInfo[] {
   const skus: SkuInfo[] = [];
   const third = Math.max(1, Math.floor(count / 3));
-
   for (let i = 0; i < count; i++) {
     let velocity: Velocity;
     if (i < third) velocity = "high";
     else if (i < third * 2) velocity = "medium";
     else velocity = "low";
 
-    // High velocity SKUs → heavy (600-1000 kg)
-    // 50% of low velocity SKUs → also heavy, other 50% → light (200-500 kg)
-    // Medium → any distribution (200-1000 kg)
     let weightKg: number;
     if (velocity === "high") {
-      weightKg = 600 + Math.random() * 400; // 600-1000 kg (heavy)
+      weightKg = 600 + Math.random() * 400;
     } else if (velocity === "low") {
-      if (Math.random() < 0.5) {
-        weightKg = 600 + Math.random() * 400; // heavy half
-      } else {
-        weightKg = 200 + Math.random() * 300; // light half
-      }
+      weightKg = Math.random() < 0.5 ? 600 + Math.random() * 400 : 200 + Math.random() * 300;
     } else {
-      weightKg = 200 + Math.random() * 800; // 200-1000 kg (any)
+      weightKg = 200 + Math.random() * 800;
     }
 
     skus.push({
@@ -60,24 +88,85 @@ function generateSkuCatalog(count: number): SkuInfo[] {
   return skus;
 }
 
-/**
- * Pick a SKU for a new order using 5:3:1 ratio (high:medium:low).
- */
 function pickSkuForOrder(catalog: SkuInfo[]): SkuInfo {
   const high = catalog.filter((s) => s.velocity === "high");
   const medium = catalog.filter((s) => s.velocity === "medium");
   const low = catalog.filter((s) => s.velocity === "low");
-
-  // Weighted random: 5 parts high, 3 parts medium, 1 part low
   const r = Math.random() * 9;
   let pool: SkuInfo[];
   if (r < 5 && high.length > 0) pool = high;
   else if (r < 8 && medium.length > 0) pool = medium;
   else if (low.length > 0) pool = low;
-  else pool = catalog; // fallback
-
+  else pool = catalog;
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
+/**
+ * Compute actual distance in meters for a path (sum of edge distance_m).
+ */
+function computePathDistanceM(path: string[], graph: WarehouseGraph): number {
+  let dist = 0;
+  for (let i = 0; i < path.length - 1; i++) {
+    const edge = graph.data.edges.find(
+      (e) =>
+        (e.a === path[i] && e.b === path[i + 1]) ||
+        (e.b === path[i] && e.a === path[i + 1]),
+    );
+    if (edge) dist += edge.distance_m;
+  }
+  return dist;
+}
+
+/**
+ * How many ticks (seconds) does it take to traverse one edge?
+ * XY: distance / botSpeedMps
+ * Z-up: distance / zUpSpeedMps
+ * Z-down: distance / zDownSpeedMps
+ * All rounded up, minimum 1 tick.
+ */
+function edgeTravelTicks(
+  fromId: string,
+  toId: string,
+  graph: WarehouseGraph,
+  config: SimConfig,
+): number {
+  const edge = graph.data.edges.find(
+    (e) =>
+      (e.a === fromId && e.b === toId) ||
+      (e.b === fromId && e.a === toId),
+  );
+  if (!edge) return 1;
+
+  if (edge.axis === "z") {
+    const fromNode = graph.nodeMap.get(fromId);
+    const toNode = graph.nodeMap.get(toId);
+    if (fromNode && toNode) {
+      const goingUp = toNode.position.z_m > fromNode.position.z_m;
+      const speed = goingUp ? config.zUpSpeedMps : config.zDownSpeedMps;
+      return Math.max(1, Math.ceil(edge.distance_m / speed));
+    }
+  }
+
+  return Math.max(1, Math.ceil(edge.distance_m / config.botSpeedMps));
+}
+
+/**
+ * Check if a node is occupied by another bot that is in an edge-wait state
+ * (i.e. doing a slow Z traversal). Other bots must wait for it to finish.
+ */
+function isNodeBlockedByBot(
+  nodeId: string,
+  botId: number,
+  botPositions: Map<string, number>,
+  bots: Bot[],
+): boolean {
+  const occupyingBotId = botPositions.get(nodeId);
+  if (occupyingBotId === undefined || occupyingBotId === botId) return false;
+  // The node is occupied by another bot — block
+  return true;
+}
+
+// ─── State creation ───
 
 export function createInitialState(
   graph: WarehouseGraph,
@@ -90,11 +179,7 @@ export function createInitialState(
   );
 
   const startNodes =
-    aisles.length > 0
-      ? aisles
-      : stationOps.length > 0
-        ? stationOps
-        : graph.data.nodes;
+    aisles.length > 0 ? aisles : stationOps.length > 0 ? stationOps : graph.data.nodes;
 
   const bots: Bot[] = [];
   for (let i = 0; i < config.botCount; i++) {
@@ -109,7 +194,7 @@ export function createInitialState(
       task: null,
       stepsRemaining: 0,
       moveProgress: 1,
-      zWaitTicks: 0,
+      edgeWaitTicks: 0,
       totalIdleSteps: 0,
       totalBusySteps: 0,
       tasksCompleted: 0,
@@ -119,7 +204,6 @@ export function createInitialState(
 
   const skuCatalog = generateSkuCatalog(config.skuCount);
 
-  // Pre-fill warehouse
   const pallets = new Map<string, Pallet>();
   const fillCount = Math.floor(palletPositions.length * config.initialFillPct);
   const shuffled = [...palletPositions].sort(() => Math.random() - 0.5);
@@ -133,10 +217,8 @@ export function createInitialState(
     });
   }
 
-  // Determine initial shift phase
   let shiftPhase: "fill" | "drain" | "done" = "fill";
   if (config.shiftMode === "pure-retrieve") shiftPhase = "drain";
-  if (config.shiftMode === "mixed") shiftPhase = "fill"; // doesn't matter for mixed
 
   return {
     step: 0,
@@ -156,6 +238,8 @@ export function createInitialState(
   };
 }
 
+// ─── Task generation ───
+
 let taskCounter = 0;
 
 function generateShiftTask(
@@ -168,37 +252,18 @@ function generateShiftTask(
 
   const totalTarget = config.shiftPalletCount;
   const generated = state.shiftTasksGenerated;
-
-  if (generated >= totalTarget) {
-    return { task: null, newPhase: "done" };
-  }
+  if (generated >= totalTarget) return { task: null, newPhase: "done" };
 
   const station = stationOps[Math.floor(Math.random() * stationOps.length)];
-  const skuInfo =
-    pickSkuForOrder(state.skuCatalog);
+  const skuInfo = pickSkuForOrder(state.skuCatalog);
 
-  const palletPositions = graph.data.nodes.filter(
-    (n) => n.kind === "PALLET_POSITION",
-  );
-  const maxPositions = palletPositions.length;
-
-  // Figure out if this task is induction or retrieval
   let wantInduction: boolean;
-
   switch (config.shiftMode) {
-    case "pure-induct":
-      wantInduction = true;
-      break;
-    case "pure-retrieve":
-      wantInduction = false;
-      break;
+    case "pure-induct": wantInduction = true; break;
+    case "pure-retrieve": wantInduction = false; break;
     case "fill-drain": {
       const half = Math.ceil(totalTarget / 2);
-      if (state.shiftPhase === "fill" && generated < half) {
-        wantInduction = true;
-      } else {
-        wantInduction = false;
-      }
+      wantInduction = state.shiftPhase === "fill" && generated < half;
       break;
     }
     case "mixed":
@@ -207,7 +272,6 @@ function generateShiftTask(
       break;
   }
 
-  // Positions already claimed by pending tasks
   const pendingInductPositions = new Set(
     state.tasks.filter((t) => t.type === "INDUCTION").map((t) => t.positionNodeId),
   );
@@ -216,19 +280,11 @@ function generateShiftTask(
   );
 
   if (wantInduction) {
-    // Smart position selection: weight-level compliance, blocker minimization,
-    // level balance, radial balance
     const levelMaxMass = buildLevelMaxMass(graph);
     const targetId = selectInductionPosition(
-      graph,
-      state,
-      skuInfo.weightKg,
-      levelMaxMass,
-      pendingInductPositions,
-      skuInfo.velocity,
+      graph, state, skuInfo.weightKg, levelMaxMass, pendingInductPositions, skuInfo.velocity,
     );
     if (targetId === null) {
-      // Can't induct — warehouse full. For mixed mode, try retrieve instead
       if (config.shiftMode === "mixed") {
         return tryRetrieve(state, graph, station, skuInfo, pendingRetrievePositions);
       }
@@ -236,21 +292,13 @@ function generateShiftTask(
     }
     return {
       task: {
-        id: taskCounter++,
-        type: "INDUCTION",
-        sku: skuInfo.sku,
-        stationNodeId: station.id,
-        positionNodeId: targetId,
-        assignedBotId: null,
-        createdAtStep: state.step,
-        completedAtStep: null,
-        travelDistanceM: 0,
-        blockerPenalty: 0,
+        id: taskCounter++, type: "INDUCTION", sku: skuInfo.sku,
+        stationNodeId: station.id, positionNodeId: targetId,
+        assignedBotId: null, createdAtStep: state.step,
+        completedAtStep: null, travelDistanceM: 0, blockerPenalty: 0,
       },
-      newPhase:
-        config.shiftMode === "fill-drain" && generated + 1 >= Math.ceil(totalTarget / 2)
-          ? "drain"
-          : state.shiftPhase,
+      newPhase: config.shiftMode === "fill-drain" && generated + 1 >= Math.ceil(totalTarget / 2)
+        ? "drain" : state.shiftPhase,
     };
   } else {
     return tryRetrieve(state, graph, station, skuInfo, pendingRetrievePositions);
@@ -264,88 +312,65 @@ function tryRetrieve(
   skuInfo: SkuInfo,
   pendingRetrievePositions: Set<string>,
 ): { task: Task | null; newPhase: "fill" | "drain" | "done" } {
-  // Find occupied positions not already claimed
   const available = Array.from(state.pallets.entries()).filter(
     ([id]) => !pendingRetrievePositions.has(id),
   );
-  if (available.length === 0) {
-    return { task: null, newPhase: state.shiftPhase };
-  }
+  if (available.length === 0) return { task: null, newPhase: state.shiftPhase };
 
-  // Prefer matching SKU
   const matching = available.filter(([, p]) => p.sku === skuInfo.sku);
-  const [targetId] =
-    matching.length > 0
-      ? matching[Math.floor(Math.random() * matching.length)]
-      : available[Math.floor(Math.random() * available.length)];
-
-  const actualSku = state.pallets.get(targetId)!.sku;
+  const [targetId] = matching.length > 0
+    ? matching[Math.floor(Math.random() * matching.length)]
+    : available[Math.floor(Math.random() * available.length)];
 
   return {
     task: {
-      id: taskCounter++,
-      type: "RETRIEVAL",
-      sku: actualSku,
-      stationNodeId: station.id,
-      positionNodeId: targetId,
-      assignedBotId: null,
-      createdAtStep: state.step,
-      completedAtStep: null,
-      travelDistanceM: 0,
-      blockerPenalty: 0,
+      id: taskCounter++, type: "RETRIEVAL", sku: state.pallets.get(targetId)!.sku,
+      stationNodeId: station.id, positionNodeId: targetId,
+      assignedBotId: null, createdAtStep: state.step,
+      completedAtStep: null, travelDistanceM: 0, blockerPenalty: 0,
     },
     newPhase: state.shiftPhase,
   };
 }
 
+// ─── Bot movement ───
+
 /**
- * Check if moving from prevNode to nextNode is a Z-axis move and return
- * the extra ticks to wait. Returns 0 for XY moves.
+ * Attempt to move bot one node along path. Returns true if arrived at end.
+ * If next node is blocked by another bot, the bot waits (returns false, no move).
  */
-function getZWaitTicks(
-  prevNodeId: string,
-  nextNodeId: string,
-  graph: WarehouseGraph,
-  config: SimConfig,
-): number {
-  const edge = graph.data.edges.find(
-    (e) =>
-      (e.a === prevNodeId && e.b === nextNodeId) ||
-      (e.b === prevNodeId && e.a === nextNodeId),
-  );
-  if (!edge || edge.axis !== "z") return 0;
-
-  const prev = graph.nodeMap.get(prevNodeId);
-  const next = graph.nodeMap.get(nextNodeId);
-  if (!prev || !next) return 0;
-
-  const goingUp = next.position.z_m > prev.position.z_m;
-  // Subtract 1 because the move itself takes 1 tick
-  return goingUp
-    ? Math.max(0, config.zUpTravelMultiplier - 1)
-    : Math.max(0, config.zDownTravelMultiplier - 1);
-}
-
 function moveBotAlongPath(
   bot: Bot,
   graph: WarehouseGraph,
   config: SimConfig,
+  botPositions: Map<string, number>,
+  allBots: Bot[],
 ): boolean {
   if (bot.pathIndex >= bot.path.length - 1) return true;
 
   const nextNodeId = bot.path[bot.pathIndex + 1];
 
-  // Check Z-wait for this edge
-  const extraTicks = getZWaitTicks(bot.currentNodeId, nextNodeId, graph, config);
-  if (extraTicks > 0) {
-    bot.zWaitTicks = extraTicks;
+  // Check if next node is blocked by another bot
+  if (isNodeBlockedByBot(nextNodeId, bot.id, botPositions, allBots)) {
+    // Wait — don't move this tick
+    return false;
   }
 
+  // Calculate how many ticks this edge takes
+  const ticks = edgeTravelTicks(bot.currentNodeId, nextNodeId, graph, config);
+
+  // Move to next node
   bot.prevNodeId = bot.currentNodeId;
   bot.pathIndex++;
   bot.currentNodeId = bot.path[bot.pathIndex];
   bot.moveProgress = 0;
 
+  // If edge takes more than 1 tick, set wait
+  if (ticks > 1) {
+    bot.edgeWaitTicks = ticks - 1;
+  }
+
+  // Track actual distance
   const edge = graph.data.edges.find(
     (e) =>
       (e.a === bot.prevNodeId && e.b === bot.currentNodeId) ||
@@ -356,14 +381,16 @@ function moveBotAlongPath(
   return bot.pathIndex >= bot.path.length - 1;
 }
 
+// ─── Simulation step ───
+
 export function stepSimulation(
   graph: WarehouseGraph,
   state: SimState,
   config: SimConfig,
 ): SimState {
-  // Don't advance if shift is already done
   if (state.shiftDone) return state;
 
+  // Each tick = 1 second of sim time
   const newStep = state.step + 1;
 
   const pallets = new Map(state.pallets);
@@ -375,7 +402,7 @@ export function stepSimulation(
   let shiftPhase = state.shiftPhase;
   let shiftDone: boolean = state.shiftDone;
 
-  // Generate tasks if shift not done and we have idle bots or few pending tasks
+  // Generate tasks
   const idleBots = state.bots.filter((b) => b.state === "IDLE").length;
   const unassignedTasks = tasks.filter((t) => t.assignedBotId === null).length;
 
@@ -390,12 +417,8 @@ export function stepSimulation(
       shiftTasksGenerated++;
       shiftPhase = newPhase;
     }
-    if (shiftTasksGenerated >= config.shiftPalletCount) {
-      shiftDone = tasks.length === 0 && completedTasks.length >= config.shiftPalletCount;
-    }
   }
 
-  // Check if all tasks are done
   if (shiftTasksGenerated >= config.shiftPalletCount && tasks.length === 0) {
     shiftDone = true;
   }
@@ -404,19 +427,37 @@ export function stepSimulation(
   const updatedBots = state.bots.map((bot) => {
     const b = { ...bot };
 
-    // Advance move interpolation
+    // Advance rendering interpolation
     if (b.moveProgress < 1) {
       b.moveProgress = Math.min(1, b.moveProgress + 0.3);
     }
 
-    // Handle Z-wait states
-    if (b.state === "TRAVELING_Z_WAIT" || b.state === "TRAVELING_Z_WAIT_DROP") {
+    // Handle edge-wait (slow edges: Z traversal, long XY edges)
+    if (b.state === "EDGE_WAIT" || b.state === "EDGE_WAIT_DROP") {
       b.totalBusySteps++;
-      b.zWaitTicks--;
-      if (b.zWaitTicks <= 0) {
-        b.state = b.state === "TRAVELING_Z_WAIT"
-          ? "TRAVELING_TO_PICKUP"
-          : "TRAVELING_TO_DROPOFF";
+      b.edgeWaitTicks--;
+      if (b.edgeWaitTicks <= 0) {
+        // Resume traveling
+        const travelState = b.state === "EDGE_WAIT"
+          ? "TRAVELING_TO_PICKUP" as const
+          : "TRAVELING_TO_DROPOFF" as const;
+
+        // Check if we've already arrived at destination
+        if (b.pathIndex >= b.path.length - 1) {
+          if (travelState === "TRAVELING_TO_PICKUP") {
+            b.state = "PICKING";
+            b.stepsRemaining = b.task?.type === "INDUCTION"
+              ? config.stationPickTimeS
+              : config.positionPickTimeS;
+          } else {
+            b.state = "PLACING";
+            b.stepsRemaining = b.task?.type === "INDUCTION"
+              ? config.positionDropTimeS
+              : config.stationDropTimeS;
+          }
+        } else {
+          b.state = travelState;
+        }
       }
       return b;
     }
@@ -429,26 +470,22 @@ export function stepSimulation(
           unassigned.assignedBotId = b.id;
           b.task = { ...unassigned };
 
-          const pickupTarget =
-            unassigned.type === "INDUCTION"
-              ? unassigned.stationNodeId
-              : unassigned.positionNodeId;
+          const pickupTarget = unassigned.type === "INDUCTION"
+            ? unassigned.stationNodeId
+            : unassigned.positionNodeId;
 
-          const pathResult = findPath(b.currentNodeId, pickupTarget);
+          // Not carrying yet — use normal pathfinding
+          const pathResult = findPathForBot(b.currentNodeId, pickupTarget, false, graph, pallets);
           if (pathResult) {
             b.path = pathResult.path;
             b.pathIndex = 0;
             b.state = "TRAVELING_TO_PICKUP";
-            b.task.travelDistanceM += pathResult.totalCost;
+            b.task.travelDistanceM += computePathDistanceM(pathResult.path, graph);
 
             eventLog.push({
-              step: newStep,
-              type: unassigned.type,
-              sku: unassigned.sku,
-              botId: b.id,
-              stationId: unassigned.stationNodeId,
-              positionId: unassigned.positionNodeId,
-              status: "assigned",
+              step: newStep, type: unassigned.type, sku: unassigned.sku,
+              botId: b.id, stationId: unassigned.stationNodeId,
+              positionId: unassigned.positionNodeId, status: "assigned",
             });
           }
         }
@@ -458,19 +495,16 @@ export function stepSimulation(
       case "TRAVELING_TO_PICKUP": {
         b.totalBusySteps++;
         botPositions.delete(b.currentNodeId);
-        const arrived = moveBotAlongPath(b, graph, config);
+        const arrived = moveBotAlongPath(b, graph, config, botPositions, state.bots);
         botPositions.set(b.currentNodeId, b.id);
 
-        // If we just did a Z move, enter wait state
-        if (b.zWaitTicks > 0) {
-          b.state = "TRAVELING_Z_WAIT";
+        if (b.edgeWaitTicks > 0) {
+          b.state = "EDGE_WAIT";
           return b;
         }
 
         if (arrived) {
           b.state = "PICKING";
-          // Induction: picking up at station (operator load time)
-          // Retrieval: picking up at rack position (bot pick time)
           b.stepsRemaining = b.task?.type === "INDUCTION"
             ? config.stationPickTimeS
             : config.positionPickTimeS;
@@ -482,17 +516,17 @@ export function stepSimulation(
         b.totalBusySteps++;
         b.stepsRemaining--;
         if (b.stepsRemaining <= 0 && b.task) {
-          const dropoffTarget =
-            b.task.type === "INDUCTION"
-              ? b.task.positionNodeId
-              : b.task.stationNodeId;
+          const dropoffTarget = b.task.type === "INDUCTION"
+            ? b.task.positionNodeId
+            : b.task.stationNodeId;
 
-          const pathResult = findPath(b.currentNodeId, dropoffTarget);
+          // Carrying pallet — use blocked pathfinding to avoid occluded nodes
+          const pathResult = findPathForBot(b.currentNodeId, dropoffTarget, true, graph, pallets);
           if (pathResult) {
             b.path = pathResult.path;
             b.pathIndex = 0;
             b.state = "TRAVELING_TO_DROPOFF";
-            b.task.travelDistanceM += pathResult.totalCost;
+            b.task.travelDistanceM += computePathDistanceM(pathResult.path, graph);
           } else {
             b.state = "IDLE";
             b.task = null;
@@ -504,18 +538,16 @@ export function stepSimulation(
       case "TRAVELING_TO_DROPOFF": {
         b.totalBusySteps++;
         botPositions.delete(b.currentNodeId);
-        const arrived = moveBotAlongPath(b, graph, config);
+        const arrived = moveBotAlongPath(b, graph, config, botPositions, state.bots);
         botPositions.set(b.currentNodeId, b.id);
 
-        if (b.zWaitTicks > 0) {
-          b.state = "TRAVELING_Z_WAIT_DROP";
+        if (b.edgeWaitTicks > 0) {
+          b.state = "EDGE_WAIT_DROP";
           return b;
         }
 
         if (arrived) {
           b.state = "PLACING";
-          // Induction: placing at rack position (bot place time)
-          // Retrieval: dropping at station (operator unload time)
           b.stepsRemaining = b.task?.type === "INDUCTION"
             ? config.positionDropTimeS
             : config.stationDropTimeS;
@@ -528,9 +560,7 @@ export function stepSimulation(
         b.stepsRemaining--;
         if (b.stepsRemaining <= 0 && b.task) {
           if (b.task.type === "INDUCTION") {
-            const skuInfo = state.skuCatalog.find(
-              (s) => s.sku === b.task!.sku,
-            );
+            const skuInfo = state.skuCatalog.find((s) => s.sku === b.task!.sku);
             pallets.set(b.task.positionNodeId, {
               sku: b.task.sku,
               weightKg: skuInfo?.weightKg ?? 500,
@@ -546,13 +576,9 @@ export function stepSimulation(
           tasks = tasks.filter((t) => t.id !== b.task!.id);
 
           eventLog.push({
-            step: newStep,
-            type: b.task.type,
-            sku: b.task.sku,
-            botId: b.id,
-            stationId: b.task.stationNodeId,
-            positionId: b.task.positionNodeId,
-            status: "completed",
+            step: newStep, type: b.task.type, sku: b.task.sku,
+            botId: b.id, stationId: b.task.stationNodeId,
+            positionId: b.task.positionNodeId, status: "completed",
           });
 
           b.tasksCompleted++;
@@ -566,58 +592,33 @@ export function stepSimulation(
     return b;
   });
 
-  const trimmedLog =
-    eventLog.length > 200 ? eventLog.slice(eventLog.length - 200) : eventLog;
+  const trimmedLog = eventLog.length > 200 ? eventLog.slice(eventLog.length - 200) : eventLog;
 
   return {
-    step: newStep,
-    bots: updatedBots,
-    tasks,
-    completedTasks,
-    pallets,
-    botPositions,
-    skuCatalog: state.skuCatalog,
-    eventLog: trimmedLog,
-    shiftTasksGenerated,
-    shiftPhase,
-    shiftDone,
-    evalResults: state.evalResults,
-    evalRunning: state.evalRunning,
+    step: newStep, bots: updatedBots, tasks, completedTasks, pallets, botPositions,
+    skuCatalog: state.skuCatalog, eventLog: trimmedLog,
+    shiftTasksGenerated, shiftPhase, shiftDone,
+    evalResults: state.evalResults, evalRunning: state.evalRunning,
     currentShiftIndex: state.currentShiftIndex,
   };
 }
 
-/**
- * Run a full multi-shift eval: runs N shifts back-to-back, collecting results.
- * Returns the final state with evalResults populated.
- */
+// ─── Multi-shift eval ───
+
 export function runMultiShiftEval(
   graph: WarehouseGraph,
   config: SimConfig,
 ): SimState {
   const results: import("./types").ShiftResult[] = [];
-
   let carryPallets: Map<string, Pallet> | null = null;
 
   for (let i = 0; i < config.evalShiftCount; i++) {
-    // Create fresh state for each shift, carrying over pallets from previous
     let state = createInitialState(graph, config);
+    if (carryPallets) state = { ...state, pallets: new Map(carryPallets) };
+    state = { ...state, evalRunning: true, currentShiftIndex: i, evalResults: results };
 
-    // If we have pallets from previous shift, use them
-    if (carryPallets) {
-      state = { ...state, pallets: new Map(carryPallets) };
-    }
-
-    state = {
-      ...state,
-      evalRunning: true,
-      currentShiftIndex: i,
-      evalResults: results,
-    };
-
-    // Run until shift done
     let safety = 0;
-    const maxSteps = config.shiftPalletCount * 500; // safety limit
+    const maxSteps = config.shiftPalletCount * 500;
     while (!state.shiftDone && safety < maxSteps) {
       state = stepSimulation(graph, state, config);
       safety++;
@@ -625,7 +626,7 @@ export function runMultiShiftEval(
 
     const inductions = state.completedTasks.filter((t) => t.type === "INDUCTION").length;
     const retrievals = state.completedTasks.filter((t) => t.type === "RETRIEVAL").length;
-    const timeHr = state.step / 3600;
+    const timeHr = state.step / 3600; // step = seconds
     const avgUtil = state.bots.length > 0
       ? state.bots.reduce(
           (sum, b) => sum + b.totalBusySteps / Math.max(1, b.totalBusySteps + b.totalIdleSteps),
@@ -634,31 +635,20 @@ export function runMultiShiftEval(
       : 0;
 
     results.push({
-      shiftIndex: i,
-      steps: state.step,
-      completed: state.completedTasks.length,
-      inductions,
-      retrievals,
+      shiftIndex: i, steps: state.step, completed: state.completedTasks.length,
+      inductions, retrievals,
       palletsPerHour: timeHr > 0 ? state.completedTasks.length / timeHr : 0,
       avgBotUtilization: avgUtil,
     });
 
-    // Carry pallets to next shift
     carryPallets = state.pallets;
   }
 
-  // Return a final state with all eval results
   let finalState = createInitialState(graph, config);
-  if (carryPallets) {
-    finalState = { ...finalState, pallets: new Map(carryPallets) };
-  }
-  finalState = {
+  if (carryPallets) finalState = { ...finalState, pallets: new Map(carryPallets) };
+  return {
     ...finalState,
-    evalResults: results,
-    evalRunning: false,
-    shiftDone: true,
+    evalResults: results, evalRunning: false, shiftDone: true,
     currentShiftIndex: config.evalShiftCount - 1,
   };
-
-  return finalState;
 }

@@ -2,23 +2,22 @@ export type ShiftMode = "fill-drain" | "mixed" | "pure-induct" | "pure-retrieve"
 
 export type SimConfig = {
   botCount: number;
-  botSpeedMps: number;
+
+  // Bot movement
+  botSpeedMps: number;        // horizontal travel speed (m/s)
+  zUpSpeedMps: number;        // vertical up speed (m/s) — typically much slower
+  zDownSpeedMps: number;      // vertical down speed (m/s)
+  xyTurnTimeS: number;        // time to turn within XY plane (seconds)
+  xyzTransitionTimeS: number; // time to transition between XY and Z movement (seconds)
 
   // Station times (at the operator station)
-  stationPickTimeS: number;  // time for operator to load pallet onto bot at station (induction)
-  stationDropTimeS: number;  // time for operator to unload pallet from bot at station (retrieval)
+  stationPickTimeS: number;   // operator loads pallet onto bot (induction start)
+  stationDropTimeS: number;   // operator unloads pallet from bot (retrieval end)
 
-  // Position times (at the pallet position in the rack)
-  positionPickTimeS: number; // time for bot to pick pallet from rack position (retrieval)
-  positionDropTimeS: number; // time for bot to place pallet into rack position (induction)
+  // Position times (at the pallet rack position)
+  positionPickTimeS: number;  // bot picks pallet from rack (retrieval start)
+  positionDropTimeS: number;  // bot places pallet into rack (induction end)
 
-  xyCostPerM: number;
-  zUpCostPerM: number;
-  zDownCostPerM: number;
-  xyTurnCost: number;
-  xyzTurnCost: number;
-  zUpTravelMultiplier: number;
-  zDownTravelMultiplier: number;
   initialFillPct: number;
   skuCount: number;
 
@@ -27,23 +26,20 @@ export type SimConfig = {
   shiftPalletCount: number;
 
   // Multi-shift eval
-  evalShiftCount: number; // number of shifts in a full eval run
+  evalShiftCount: number;
 };
 
 export const DEFAULT_CONFIG: SimConfig = {
   botCount: 5,
-  botSpeedMps: 1.0,
+  botSpeedMps: 1.0,        // 1 m/s horizontal
+  zUpSpeedMps: 0.1,         // 0.1 m/s going up (10x slower than horizontal)
+  zDownSpeedMps: 0.5,       // 0.5 m/s going down (2x slower than horizontal)
+  xyTurnTimeS: 2,           // 2 seconds to turn in XY
+  xyzTransitionTimeS: 3,    // 3 seconds to switch between XY and Z
   stationPickTimeS: 8,
   stationDropTimeS: 6,
   positionPickTimeS: 4,
   positionDropTimeS: 5,
-  xyCostPerM: 1.0,
-  zUpCostPerM: 3.0,
-  zDownCostPerM: 2.0,
-  xyTurnCost: 2.0,
-  xyzTurnCost: 3.0,
-  zUpTravelMultiplier: 10,
-  zDownTravelMultiplier: 2,
   initialFillPct: 0.0,
   skuCount: 20,
   shiftMode: "mixed",
@@ -54,10 +50,10 @@ export const DEFAULT_CONFIG: SimConfig = {
 export type BotState =
   | "IDLE"
   | "TRAVELING_TO_PICKUP"
-  | "TRAVELING_Z_WAIT"
+  | "EDGE_WAIT"            // waiting out remaining ticks for current edge traversal
   | "PICKING"
   | "TRAVELING_TO_DROPOFF"
-  | "TRAVELING_Z_WAIT_DROP"
+  | "EDGE_WAIT_DROP"       // same but during dropoff leg
   | "PLACING";
 
 export type Bot = {
@@ -68,9 +64,9 @@ export type Bot = {
   path: string[];
   pathIndex: number;
   task: Task | null;
-  stepsRemaining: number;
-  moveProgress: number;
-  zWaitTicks: number;
+  stepsRemaining: number;   // ticks left for current operation (pick/place/edge)
+  moveProgress: number;     // 0-1 for rendering interpolation
+  edgeWaitTicks: number;    // remaining ticks for current edge traversal
   totalIdleSteps: number;
   totalBusySteps: number;
   tasksCompleted: number;
@@ -119,12 +115,10 @@ export type SimState = {
   skuCatalog: SkuInfo[];
   eventLog: EventLogEntry[];
 
-  // Shift tracking
   shiftTasksGenerated: number;
   shiftPhase: "fill" | "drain" | "done";
   shiftDone: boolean;
 
-  // Multi-shift eval
   evalResults: ShiftResult[];
   evalRunning: boolean;
   currentShiftIndex: number;

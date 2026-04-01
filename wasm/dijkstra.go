@@ -12,8 +12,12 @@ type PathResult struct {
 }
 
 // Dijkstra finds the shortest path from source to target in the directed graph.
-// Returns nil if no path exists.
-func Dijkstra(g *DirectedGraph, sourceID, targetID string) *PathResult {
+// Returns nil if no path exists. blockedNodes are physical node IDs to avoid.
+func Dijkstra(g *DirectedGraph, sourceID, targetID string, blockedNodes ...map[string]bool) *PathResult {
+	var blocked map[string]bool
+	if len(blockedNodes) > 0 && blockedNodes[0] != nil {
+		blocked = blockedNodes[0]
+	}
 	dist := make(map[DirNode]float64)
 	prev := make(map[DirNode]DirNode)
 	hasPrev := make(map[DirNode]bool)
@@ -77,6 +81,10 @@ func Dijkstra(g *DirectedGraph, sourceID, targetID string) *PathResult {
 
 		// Expand neighbors
 		for _, edge := range g.adj[node] {
+			// Skip blocked nodes (but allow source and target through)
+			if blocked != nil && blocked[edge.To.NodeID] && edge.To.NodeID != sourceID && edge.To.NodeID != targetID {
+				continue
+			}
 			newCost := cost + edge.Cost
 			if oldDist, ok := dist[edge.To]; !ok || newCost < oldDist {
 				dist[edge.To] = newCost

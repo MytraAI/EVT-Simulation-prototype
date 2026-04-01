@@ -178,7 +178,7 @@ export function Viewport2D() {
         // Carrying indicator
         if (
           bot.state === "TRAVELING_TO_DROPOFF" ||
-          bot.state === "TRAVELING_Z_WAIT_DROP" ||
+          bot.state === "EDGE_WAIT_DROP" ||
           bot.state === "PLACING"
         ) {
           ctx.beginPath();

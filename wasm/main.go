@@ -149,6 +149,56 @@ func findPath(_ js.Value, args []js.Value) any {
 	})
 }
 
+// findPathBlocked runs Dijkstra with a set of blocked node IDs.
+// Called from JS: wasmFindPathBlocked(sourceID, targetID, blockedJSON)
+// blockedJSON is a JSON array of node IDs to avoid: ["a-1-3-4", "p-1-2-3-0"]
+func findPathBlocked(_ js.Value, args []js.Value) any {
+	if currentGraph == nil {
+		return jsError("graph not loaded")
+	}
+	if len(args) < 3 {
+		return jsError("findPathBlocked requires 3 args: sourceID, targetID, blockedJSON")
+	}
+
+	sourceID := args[0].String()
+	targetID := args[1].String()
+	blockedJSON := args[2].String()
+
+	// Parse blocked nodes
+	blocked := make(map[string]bool)
+	if blockedJSON != "" && blockedJSON != "[]" {
+		var blockedList []string
+		if err := json.Unmarshal([]byte(blockedJSON), &blockedList); err == nil {
+			for _, id := range blockedList {
+				blocked[id] = true
+			}
+		}
+	}
+
+	result := Dijkstra(currentGraph, sourceID, targetID, blocked)
+	if result == nil {
+		// Fallback: try without blocked nodes (better to find a longer path than none)
+		result = Dijkstra(currentGraph, sourceID, targetID)
+		if result == nil {
+			return js.ValueOf(map[string]any{
+				"ok":    false,
+				"error": "no path found",
+			})
+		}
+	}
+
+	pathArr := make([]any, len(result.Path))
+	for i, p := range result.Path {
+		pathArr[i] = p
+	}
+
+	return js.ValueOf(map[string]any{
+		"ok":        true,
+		"totalCost": result.TotalCost,
+		"path":      pathArr,
+	})
+}
+
 // singleSource runs single-source Dijkstra.
 // Called from JS: wasmSingleSource(sourceID) → {nodeID: cost, ...}
 func singleSource(_ js.Value, args []js.Value) any {
@@ -176,6 +226,7 @@ func jsError(msg string) js.Value {
 func main() {
 	js.Global().Set("wasmLoadGraph", js.FuncOf(loadGraph))
 	js.Global().Set("wasmFindPath", js.FuncOf(findPath))
+	js.Global().Set("wasmFindPathBlocked", js.FuncOf(findPathBlocked))
 	js.Global().Set("wasmSingleSource", js.FuncOf(singleSource))
 
 	// Block forever

@@ -46,7 +46,7 @@ export function MetricsPanel({ height }: Props) {
     ? `${completedCount} / ${simState.shiftTasksGenerated}`
     : "—";
 
-  // Time: each tick = 0.5s at 1x (matches 500ms interval). Use step count as sim-seconds.
+  // Each tick = 1 second of sim time. Bot travel time per edge = distance/speed.
   const shiftTimeS = step;
   const shiftTimeMin = (shiftTimeS / 60).toFixed(1);
   const shiftTimeHr = shiftTimeS / 3600;

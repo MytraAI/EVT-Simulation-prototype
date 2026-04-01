@@ -7,6 +7,8 @@ declare global {
   // eslint-disable-next-line no-var
   var wasmFindPath: (sourceID: string, targetID: string) => WasmPathResult;
   // eslint-disable-next-line no-var
+  var wasmFindPathBlocked: (sourceID: string, targetID: string, blockedJSON: string) => WasmPathResult;
+  // eslint-disable-next-line no-var
   var wasmSingleSource: (sourceID: string) => Record<string, number>;
 }
 
@@ -21,7 +23,6 @@ export async function initWasm(): Promise<void> {
   if (wasmLoadPromise) return wasmLoadPromise;
 
   wasmLoadPromise = (async () => {
-    // Load wasm_exec.js
     const script = document.createElement("script");
     script.src = "/wasm_exec.js";
     await new Promise<void>((resolve, reject) => {
@@ -30,7 +31,6 @@ export async function initWasm(): Promise<void> {
       document.head.appendChild(script);
     });
 
-    // Instantiate WASM
     const go = new (globalThis as any).Go();
     const result = await WebAssembly.instantiateStreaming(
       fetch("/pathfinder.wasm"),
@@ -46,11 +46,11 @@ export async function initWasm(): Promise<void> {
 export function loadGraphIntoWasm(data: GraphData, config: SimConfig): void {
   if (!wasmReady) throw new Error("WASM not initialized");
   const costParams = JSON.stringify({
-    xyCostPerM: config.xyCostPerM,
-    zUpCostPerM: config.zUpCostPerM,
-    zDownCostPerM: config.zDownCostPerM,
-    xyTurnCost: config.xyTurnCost,
-    xyzTurnCost: config.xyzTurnCost,
+    xyCostPerM: 1.0 / config.botSpeedMps,
+    zUpCostPerM: 1.0 / config.zUpSpeedMps,
+    zDownCostPerM: 1.0 / config.zDownSpeedMps,
+    xyTurnCost: config.xyTurnTimeS,
+    xyzTurnCost: config.xyzTransitionTimeS,
   });
   const result = globalThis.wasmLoadGraph(JSON.stringify(data), costParams);
   if (!result.ok) {
@@ -58,12 +58,34 @@ export function loadGraphIntoWasm(data: GraphData, config: SimConfig): void {
   }
 }
 
+/**
+ * Find path without blocked nodes (for empty bots).
+ */
 export function findPath(
   sourceID: string,
   targetID: string,
 ): { totalCost: number; path: string[] } | null {
   if (!wasmReady) throw new Error("WASM not initialized");
   const result = globalThis.wasmFindPath(sourceID, targetID);
+  if (!result.ok) return null;
+  return { totalCost: result.totalCost!, path: result.path! };
+}
+
+/**
+ * Find path avoiding blocked nodes (for bots carrying pallets).
+ * Blocked nodes are aisle/position nodes occluded by occupied pallet positions.
+ */
+export function findPathBlocked(
+  sourceID: string,
+  targetID: string,
+  blockedNodeIds: string[],
+): { totalCost: number; path: string[] } | null {
+  if (!wasmReady) throw new Error("WASM not initialized");
+  const result = globalThis.wasmFindPathBlocked(
+    sourceID,
+    targetID,
+    JSON.stringify(blockedNodeIds),
+  );
   if (!result.ok) return null;
   return { totalCost: result.totalCost!, path: result.path! };
 }

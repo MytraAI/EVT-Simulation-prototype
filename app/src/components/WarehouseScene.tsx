@@ -215,7 +215,7 @@ function BotMeshes() {
       const carry = carryRefs.current.get(bot.id);
       if (carry) {
         const isCarrying =
-          bot.state === "TRAVELING_TO_DROPOFF" || bot.state === "TRAVELING_Z_WAIT_DROP" || bot.state === "PLACING";
+          bot.state === "TRAVELING_TO_DROPOFF" || bot.state === "EDGE_WAIT_DROP" || bot.state === "PLACING";
         carry.visible = isCarrying;
         carry.position.copy(mesh.position);
         carry.position.y += 0.25;

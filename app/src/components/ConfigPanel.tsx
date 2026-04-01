@@ -180,15 +180,6 @@ export function ConfigPanel() {
           step={1}
           onChange={set("botCount")}
         />
-        <Slider
-          label="Speed"
-          value={config.botSpeedMps}
-          min={0.1}
-          max={5}
-          step={0.1}
-          unit=" m/s"
-          onChange={set("botSpeedMps")}
-        />
       </div>
 
       {/* Station & Position times */}
@@ -234,50 +225,55 @@ export function ConfigPanel() {
         />
       </div>
 
-      {/* Cost parameters */}
+      {/* Travel speeds */}
       <div className="p-3 border-b border-gray-700">
         <h2 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-          Travel Costs
+          Travel
         </h2>
         <Slider
-          label="XY cost/m"
-          value={config.xyCostPerM}
+          label="XY speed"
+          value={config.botSpeedMps}
           min={0.1}
-          max={10}
+          max={5}
           step={0.1}
-          onChange={set("xyCostPerM")}
+          unit=" m/s"
+          onChange={set("botSpeedMps")}
         />
         <Slider
-          label="Z up cost/m"
-          value={config.zUpCostPerM}
-          min={0.1}
-          max={10}
-          step={0.1}
-          onChange={set("zUpCostPerM")}
+          label="Z-up speed"
+          value={config.zUpSpeedMps}
+          min={0.01}
+          max={2}
+          step={0.01}
+          unit=" m/s"
+          onChange={set("zUpSpeedMps")}
         />
         <Slider
-          label="Z down cost/m"
-          value={config.zDownCostPerM}
-          min={0.1}
-          max={10}
-          step={0.1}
-          onChange={set("zDownCostPerM")}
+          label="Z-down speed"
+          value={config.zDownSpeedMps}
+          min={0.01}
+          max={2}
+          step={0.01}
+          unit=" m/s"
+          onChange={set("zDownSpeedMps")}
         />
         <Slider
-          label="XY turn cost"
-          value={config.xyTurnCost}
+          label="XY turn time"
+          value={config.xyTurnTimeS}
           min={0}
           max={10}
           step={0.5}
-          onChange={set("xyTurnCost")}
+          unit=" s"
+          onChange={set("xyTurnTimeS")}
         />
         <Slider
-          label="XYZ turn cost"
-          value={config.xyzTurnCost}
+          label="XY↔Z transition time"
+          value={config.xyzTransitionTimeS}
           min={0}
           max={10}
           step={0.5}
-          onChange={set("xyzTurnCost")}
+          unit=" s"
+          onChange={set("xyzTransitionTimeS")}
         />
       </div>
 
@@ -336,30 +332,8 @@ export function ConfigPanel() {
         />
       </div>
 
-      {/* Z-travel */}
-      <div className="p-3">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-          Z-Travel
-        </h2>
-        <Slider
-          label="Z-up multiplier"
-          value={config.zUpTravelMultiplier}
-          min={1}
-          max={20}
-          step={1}
-          unit="x"
-          onChange={set("zUpTravelMultiplier")}
-        />
-        <Slider
-          label="Z-down multiplier"
-          value={config.zDownTravelMultiplier}
-          min={1}
-          max={10}
-          step={1}
-          unit="x"
-          onChange={set("zDownTravelMultiplier")}
-        />
-      </div>
+      {/* spacer */}
+      <div className="p-1" />
 
       {/* Sticky buttons */}
       <div className="sticky bottom-0 p-3 bg-gray-800 border-t border-gray-700 space-y-2">
