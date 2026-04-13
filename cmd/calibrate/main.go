@@ -182,6 +182,14 @@ type SimState struct {
 	StationMaxQueue  map[string]int // station -> peak queue depth seen
 	StationTasks     map[string]int // station -> tasks completed through this station
 
+	// Zone congestion: each node mapped to nearest station by X coordinate
+	NodeZone        map[string]string // nodeID -> stationOp ID
+	ZoneBotSum      map[string]int    // station -> cumulative bots-in-zone-ticks
+	ZoneMaxBots     map[string]int    // station -> peak bots in zone
+	ZoneGatewaySum  map[string]int    // station -> cumulative bots-at-gateway-ticks
+	ZoneGatewayMax  map[string]int    // station -> peak bots at gateway
+	GatewayNodes    map[string]string // STATION_XY nodeID -> stationOp ID
+
 	graph           *DirectedGraph
 	raw             *RawGraph
 	adjIndex        *AdjIndex
@@ -236,11 +244,62 @@ func newSimState(raw *RawGraph, g *DirectedGraph, cfg SimConfig, seed int64) *Si
 	stMax := make(map[string]int, len(stationOps))
 	stTasks := make(map[string]int, len(stationOps))
 
+	// Build node-to-zone mapping: assign every node to nearest station by X
+	stationXYs := make(map[string]string) // STATION_XY id -> nearest station op
+	nodeZone := make(map[string]string, len(raw.Nodes))
+	// Collect station X positions
+	type stnPos struct {
+		id string
+		x  float64
+	}
+	var stns []stnPos
+	for _, sid := range stationOps {
+		n := nodeIndex[sid]
+		stns = append(stns, stnPos{sid, n.Position.XM})
+	}
+	// Map STATION_XY to nearest station
+	for i := range raw.Nodes {
+		n := &raw.Nodes[i]
+		if n.Kind == "STATION_XY" {
+			best := ""
+			bestDist := math.MaxFloat64
+			for _, s := range stns {
+				d := math.Abs(n.Position.XM - s.x)
+				if d < bestDist {
+					bestDist = d
+					best = s.id
+				}
+			}
+			stationXYs[n.ID] = best
+		}
+	}
+	// Map all nodes to nearest station
+	for i := range raw.Nodes {
+		n := &raw.Nodes[i]
+		best := ""
+		bestDist := math.MaxFloat64
+		for _, s := range stns {
+			d := math.Abs(n.Position.XM - s.x)
+			if d < bestDist {
+				bestDist = d
+				best = s.id
+			}
+		}
+		nodeZone[n.ID] = best
+	}
+
+	zoneBotSum := make(map[string]int, len(stationOps))
+	zoneMaxBots := make(map[string]int, len(stationOps))
+	zoneGwSum := make(map[string]int, len(stationOps))
+	zoneGwMax := make(map[string]int, len(stationOps))
+
 	return &SimState{
 		Bots: bots, Tasks: make([]*Task, 0), CompletedTasks: make([]*Task, 0),
 		Pallets: pallets, BotPositions: botPositions,
 		StationBusyTicks: stBusy, StationQueueSum: stQueue,
 		StationMaxQueue: stMax, StationTasks: stTasks,
+		NodeZone: nodeZone, ZoneBotSum: zoneBotSum, ZoneMaxBots: zoneMaxBots,
+		ZoneGatewaySum: zoneGwSum, ZoneGatewayMax: zoneGwMax, GatewayNodes: stationXYs,
 		graph: g, raw: raw, adjIndex: BuildAdjIndex(raw), nodeIndex: nodeIndex, rng: rng,
 		stationOps: stationOps, palletPositions: palletPositions, aisles: aisles,
 		heurCache: make(map[string]map[string]float64),
@@ -660,6 +719,30 @@ func stepSimulation(s *SimState, cfg SimConfig) {
 			s.StationMaxQueue[stn] = q
 		}
 	}
+
+	// Zone congestion: count bots in each station's zone (aisles + gateway)
+	zoneBots := make(map[string]int)
+	gatewayBots := make(map[string]int)
+	for _, b := range s.Bots {
+		if zone, ok := s.NodeZone[b.CurrentNodeID]; ok {
+			zoneBots[zone]++
+		}
+		if stn, ok := s.GatewayNodes[b.CurrentNodeID]; ok {
+			gatewayBots[stn]++
+		}
+	}
+	for stn, n := range zoneBots {
+		s.ZoneBotSum[stn] += n
+		if n > s.ZoneMaxBots[stn] {
+			s.ZoneMaxBots[stn] = n
+		}
+	}
+	for stn, n := range gatewayBots {
+		s.ZoneGatewaySum[stn] += n
+		if n > s.ZoneGatewayMax[stn] {
+			s.ZoneGatewayMax[stn] = n
+		}
+	}
 }
 
 // ─── Work items ───
@@ -671,11 +754,15 @@ type WorkItem struct {
 }
 
 type StationMetrics struct {
-	ID          string  `json:"id"`
-	Tasks       int     `json:"tasks"`
-	UtilPct     float64 `json:"utilPct"`
-	AvgQueue    float64 `json:"avgQueue"`
-	MaxQueue    int     `json:"maxQueue"`
+	ID            string  `json:"id"`
+	Tasks         int     `json:"tasks"`
+	UtilPct       float64 `json:"utilPct"`
+	AvgQueue      float64 `json:"avgQueue"`
+	MaxQueue      int     `json:"maxQueue"`
+	ZoneAvgBots   float64 `json:"zoneAvgBots"`
+	ZoneMaxBots   int     `json:"zoneMaxBots"`
+	GwAvgBots     float64 `json:"gwAvgBots"`
+	GwMaxBots     int     `json:"gwMaxBots"`
 }
 
 type WorkResult struct {
@@ -752,12 +839,24 @@ func runShift(raw *RawGraph, costs CostParams, item WorkItem, palletCount int) W
 		if state.Step > 0 {
 			avgQ = float64(state.StationQueueSum[stn]) / float64(state.Step)
 		}
+		zAvg := 0.0
+		if state.Step > 0 {
+			zAvg = float64(state.ZoneBotSum[stn]) / float64(state.Step)
+		}
+		gwAvg := 0.0
+		if state.Step > 0 {
+			gwAvg = float64(state.ZoneGatewaySum[stn]) / float64(state.Step)
+		}
 		stMetrics = append(stMetrics, StationMetrics{
-			ID:       stn,
-			Tasks:    state.StationTasks[stn],
-			UtilPct:  util,
-			AvgQueue: avgQ,
-			MaxQueue: state.StationMaxQueue[stn],
+			ID:          stn,
+			Tasks:       state.StationTasks[stn],
+			UtilPct:     util,
+			AvgQueue:    avgQ,
+			MaxQueue:    state.StationMaxQueue[stn],
+			ZoneAvgBots: zAvg,
+			ZoneMaxBots: state.ZoneMaxBots[stn],
+			GwAvgBots:   gwAvg,
+			GwMaxBots:   state.ZoneGatewayMax[stn],
 		})
 	}
 
@@ -904,11 +1003,15 @@ func main() {
 	}
 
 	type SampleStation struct {
-		ID       string  `json:"id"`
-		UtilPct  float64 `json:"utilPct"`
-		AvgQueue float64 `json:"avgQueue"`
-		MaxQueue int     `json:"maxQueue"`
-		Tasks    int     `json:"tasks"`
+		ID          string  `json:"id"`
+		UtilPct     float64 `json:"utilPct"`
+		AvgQueue    float64 `json:"avgQueue"`
+		MaxQueue    int     `json:"maxQueue"`
+		Tasks       int     `json:"tasks"`
+		ZoneAvgBots float64 `json:"zoneAvgBots"`
+		ZoneMaxBots int     `json:"zoneMaxBots"`
+		GwAvgBots   float64 `json:"gwAvgBots"`
+		GwMaxBots   int     `json:"gwMaxBots"`
 	}
 
 	type Sample struct {
@@ -938,17 +1041,19 @@ func main() {
 		if len(caResults) > 0 && len(caResults[0].Stations) > 0 {
 			nShifts := float64(len(caResults))
 			for _, sm := range caResults[0].Stations {
-				var utilSum, queueSum float64
-				maxQ := 0
+				var utilSum, queueSum, zoneSum, gwSum float64
+				maxQ, zoneMax, gwMax := 0, 0, 0
 				totalTasks := 0
 				for _, r := range caResults {
 					for _, s := range r.Stations {
 						if s.ID == sm.ID {
 							utilSum += s.UtilPct
 							queueSum += s.AvgQueue
-							if s.MaxQueue > maxQ {
-								maxQ = s.MaxQueue
-							}
+							zoneSum += s.ZoneAvgBots
+							gwSum += s.GwAvgBots
+							if s.MaxQueue > maxQ { maxQ = s.MaxQueue }
+							if s.ZoneMaxBots > zoneMax { zoneMax = s.ZoneMaxBots }
+							if s.GwMaxBots > gwMax { gwMax = s.GwMaxBots }
 							totalTasks += s.Tasks
 						}
 					}
@@ -956,6 +1061,8 @@ func main() {
 				sampleStns = append(sampleStns, SampleStation{
 					ID: sm.ID, UtilPct: utilSum / nShifts,
 					AvgQueue: queueSum / nShifts, MaxQueue: maxQ, Tasks: totalTasks,
+					ZoneAvgBots: zoneSum / nShifts, ZoneMaxBots: zoneMax,
+					GwAvgBots: gwSum / nShifts, GwMaxBots: gwMax,
 				})
 			}
 		}

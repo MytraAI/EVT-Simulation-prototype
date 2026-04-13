@@ -1,958 +1,1342 @@
 {
   "metadata": {
-    "timestamp": "2026-04-12T09:23:54-07:00",
+    "timestamp": "2026-04-12T18:49:30-07:00",
     "mapPath": "app/public/grainger-pilot-04102026-graph.json",
     "shiftsPerSample": 5,
     "palletCountPerShift": 400,
-    "totalTimeS": 116.419078327,
+    "totalTimeS": 120.068004945,
     "workers": 22
   },
   "samples": [
     {
       "botCount": 2,
       "noCollision": {
-        "avgCycleTimeS": 506.3585,
-        "throughputPerHour": 35.29170981773164,
-        "avgUtilization": 0.9933099389261344,
+        "avgCycleTimeS": 506.0400000000001,
+        "throughputPerHour": 35.31595802089358,
+        "avgUtilization": 0.9939204239701442,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 514.2305,
-        "throughputPerHour": 34.75147765848138,
-        "avgUtilization": 0.9938010349137658,
-        "avgCollisionWaitPct": 0.010485356291449002,
+        "avgCycleTimeS": 514.4575,
+        "throughputPerHour": 34.74963815415568,
+        "avgUtilization": 0.9939021174889051,
+        "avgCollisionWaitPct": 0.011522580790190104,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.0155462977317453,
-      "throughputPenalty": 0.9846923778405648,
+      "cycleTimePenalty": 1.016634060548573,
+      "throughputPenalty": 0.9839641935692965,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 0.8937101397686954,
-          "avgQueue": 0.1177474545684118,
+          "utilPct": 0.8940016086647473,
+          "avgQueue": 0.12108353292057705,
           "maxQueue": 2,
-          "tasks": 262
+          "tasks": 262,
+          "zoneAvgBots": 0.8122574049657267,
+          "zoneMaxBots": 2,
+          "gwAvgBots": 0.010151295931132485,
+          "gwMaxBots": 1
         },
         {
           "id": "op-8-0",
-          "utilPct": 0.7745956151790857,
-          "avgQueue": 0.10788995262628676,
+          "utilPct": 0.7742794644128852,
+          "avgQueue": 0.10695199674148421,
           "maxQueue": 2,
-          "tasks": 228
+          "tasks": 228,
+          "zoneAvgBots": 0.26938466390340554,
+          "zoneMaxBots": 2,
+          "gwAvgBots": 0.00962931493141817,
+          "gwMaxBots": 1
         },
         {
           "id": "op-12-0",
-          "utilPct": 0.8512415830983912,
-          "avgQueue": 0.11975117569909513,
+          "utilPct": 0.8511336495599362,
+          "avgQueue": 0.11971885081560962,
           "maxQueue": 2,
-          "tasks": 256
+          "tasks": 256,
+          "zoneAvgBots": 0.3142338747276129,
+          "zoneMaxBots": 2,
+          "gwAvgBots": 0.00954473008097361,
+          "gwMaxBots": 2
         },
         {
           "id": "op-16-0",
-          "utilPct": 0.9311968194049666,
-          "avgQueue": 0.12326254068375267,
+          "utilPct": 0.9311858364558535,
+          "avgQueue": 0.12297745927489516,
           "maxQueue": 2,
-          "tasks": 271
+          "tasks": 271,
+          "zoneAvgBots": 0.6040757930169296,
+          "zoneMaxBots": 2,
+          "gwAvgBots": 0.010263828211055266,
+          "gwMaxBots": 2
         },
         {
           "id": "op-4-46",
-          "utilPct": 0.831651799642333,
-          "avgQueue": 0.1117726818536019,
+          "utilPct": 0.8320276021951841,
+          "avgQueue": 0.1113785525078002,
           "maxQueue": 2,
-          "tasks": 248
+          "tasks": 248,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 0.8758552601756205,
-          "avgQueue": 0.1212981102719604,
+          "utilPct": 0.876103087845452,
+          "avgQueue": 0.12336909280055952,
           "maxQueue": 2,
-          "tasks": 262
+          "tasks": 262,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 0.786914843396308,
-          "avgQueue": 0.10926884523493477,
+          "utilPct": 0.7865990646372045,
+          "avgQueue": 0.10889235620430768,
           "maxQueue": 2,
-          "tasks": 232
+          "tasks": 232,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 0.8120657062615347,
-          "avgQueue": 0.11079643762621671,
+          "utilPct": 0.8115437717590093,
+          "avgQueue": 0.11127794351456659,
           "maxQueue": 2,
-          "tasks": 241
+          "tasks": 241,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 5,
       "noCollision": {
-        "avgCycleTimeS": 320.6075,
-        "throughputPerHour": 88.67191374942747,
-        "avgUtilization": 0.9883403864736561,
+        "avgCycleTimeS": 320.51800000000003,
+        "throughputPerHour": 88.53941800848288,
+        "avgUtilization": 0.9875253886020843,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 334.4845,
-        "throughputPerHour": 84.90781003275399,
-        "avgUtilization": 0.9880383566035704,
-        "avgCollisionWaitPct": 0.03999648913356305,
+        "avgCycleTimeS": 334.11,
+        "throughputPerHour": 85.17141817420381,
+        "avgUtilization": 0.9899378115732306,
+        "avgCollisionWaitPct": 0.03875808143422142,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.0432834540676685,
-      "throughputPenalty": 0.9575502145210236,
+      "cycleTimePenalty": 1.0424063547133078,
+      "throughputPenalty": 0.9619604475606968,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 1.900818358715012,
-          "avgQueue": 0.2662853612566481,
+          "utilPct": 1.9065123785240583,
+          "avgQueue": 0.2721788229810854,
           "maxQueue": 3,
-          "tasks": 229
+          "tasks": 229,
+          "zoneAvgBots": 2.0026612871187925,
+          "zoneMaxBots": 5,
+          "gwAvgBots": 0.02560542614330722,
+          "gwMaxBots": 2
         },
         {
           "id": "op-8-0",
-          "utilPct": 2.0629173997999795,
-          "avgQueue": 0.2906911802015581,
+          "utilPct": 2.0710876337267354,
+          "avgQueue": 0.2941429764616002,
           "maxQueue": 4,
-          "tasks": 254
+          "tasks": 254,
+          "zoneAvgBots": 0.7015490491743333,
+          "zoneMaxBots": 5,
+          "gwAvgBots": 0.028193526855413535,
+          "gwMaxBots": 2
         },
         {
           "id": "op-12-0",
-          "utilPct": 2.147297934961931,
-          "avgQueue": 0.3042934511365898,
+          "utilPct": 2.15035243891536,
+          "avgQueue": 0.304504713712502,
           "maxQueue": 3,
-          "tasks": 260
+          "tasks": 260,
+          "zoneAvgBots": 0.7783490567192567,
+          "zoneMaxBots": 4,
+          "gwAvgBots": 0.028502919112532787,
+          "gwMaxBots": 2
         },
         {
           "id": "op-16-0",
-          "utilPct": 1.9235322760065237,
-          "avgQueue": 0.26492626949732817,
+          "utilPct": 1.9300245489839454,
+          "avgQueue": 0.2617057910974049,
           "maxQueue": 3,
-          "tasks": 229
+          "tasks": 229,
+          "zoneAvgBots": 1.517144872896735,
+          "zoneMaxBots": 5,
+          "gwAvgBots": 0.026483914185930397,
+          "gwMaxBots": 2
         },
         {
           "id": "op-4-46",
-          "utilPct": 1.99898308600731,
-          "avgQueue": 0.2708227936590687,
-          "maxQueue": 4,
-          "tasks": 243
+          "utilPct": 2.0065742914977642,
+          "avgQueue": 0.2713873045285516,
+          "maxQueue": 3,
+          "tasks": 243,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 2.127992664154367,
-          "avgQueue": 0.29959554478705475,
+          "utilPct": 2.135517724128692,
+          "avgQueue": 0.3023859121816844,
           "maxQueue": 3,
-          "tasks": 260
+          "tasks": 260,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 2.2240103494118286,
-          "avgQueue": 0.3044631439688297,
+          "utilPct": 2.2307997205364063,
+          "avgQueue": 0.3008213450223658,
           "maxQueue": 3,
-          "tasks": 268
+          "tasks": 268,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 2.1242998817563237,
-          "avgQueue": 0.2896758846864915,
+          "utilPct": 2.1302403531155543,
+          "avgQueue": 0.2921767164104595,
           "maxQueue": 4,
-          "tasks": 257
+          "tasks": 257,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 10,
       "noCollision": {
-        "avgCycleTimeS": 261.2165,
-        "throughputPerHour": 175.29545917791103,
-        "avgUtilization": 0.9806552147569741,
+        "avgCycleTimeS": 259.85499999999996,
+        "throughputPerHour": 175.52788548953123,
+        "avgUtilization": 0.9769848510517001,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 281.2185,
-        "throughputPerHour": 162.77829959767638,
-        "avgUtilization": 0.9811087889905694,
-        "avgCollisionWaitPct": 0.07220772233402253,
+        "avgCycleTimeS": 283.7375,
+        "throughputPerHour": 160.85831328675985,
+        "avgUtilization": 0.9780052692809557,
+        "avgCollisionWaitPct": 0.07555306537173372,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.076572498291647,
-      "throughputPenalty": 0.9285939314176375,
+      "cycleTimePenalty": 1.0919070250716747,
+      "throughputPenalty": 0.9164259732186754,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 4.152762565732741,
-          "avgQueue": 0.5768182680614136,
+          "utilPct": 4.103954288096842,
+          "avgQueue": 0.5829352860651388,
           "maxQueue": 4,
-          "tasks": 262
+          "tasks": 262,
+          "zoneAvgBots": 4.170094863402196,
+          "zoneMaxBots": 10,
+          "gwAvgBots": 0.062341331500125906,
+          "gwMaxBots": 2
         },
         {
           "id": "op-8-0",
-          "utilPct": 3.7335186590592877,
-          "avgQueue": 0.5412927918202053,
+          "utilPct": 3.6831961640122395,
+          "avgQueue": 0.5310495312842322,
           "maxQueue": 4,
-          "tasks": 236
+          "tasks": 236,
+          "zoneAvgBots": 1.3652944422894602,
+          "zoneMaxBots": 8,
+          "gwAvgBots": 0.05822819348641002,
+          "gwMaxBots": 2
         },
         {
           "id": "op-12-0",
-          "utilPct": 4.072041819671929,
-          "avgQueue": 0.5883268921738125,
+          "utilPct": 4.023846689635279,
+          "avgQueue": 0.5826422485046778,
           "maxQueue": 5,
-          "tasks": 253
+          "tasks": 253,
+          "zoneAvgBots": 1.5514115554559809,
+          "zoneMaxBots": 7,
+          "gwAvgBots": 0.0583804829871978,
+          "gwMaxBots": 3
         },
         {
           "id": "op-16-0",
-          "utilPct": 3.814148866515108,
-          "avgQueue": 0.5393860758058466,
+          "utilPct": 3.7701956254001274,
+          "avgQueue": 0.5284496241284058,
           "maxQueue": 4,
-          "tasks": 244
+          "tasks": 244,
+          "zoneAvgBots": 2.9120820672323164,
+          "zoneMaxBots": 9,
+          "gwAvgBots": 0.061211137643613425,
+          "gwMaxBots": 2
         },
         {
           "id": "op-4-46",
-          "utilPct": 3.887339777199201,
-          "avgQueue": 0.5470129229933087,
+          "utilPct": 3.842517370825489,
+          "avgQueue": 0.5584185126134189,
           "maxQueue": 3,
-          "tasks": 245
+          "tasks": 245,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 4.228980303980122,
-          "avgQueue": 0.5965724641990517,
-          "maxQueue": 5,
-          "tasks": 268
+          "utilPct": 4.183715291344822,
+          "avgQueue": 0.6074766350520793,
+          "maxQueue": 4,
+          "tasks": 268,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 3.8769128907578123,
-          "avgQueue": 0.5564314613289895,
+          "utilPct": 3.830767003228248,
+          "avgQueue": 0.5618455375651694,
           "maxQueue": 5,
-          "tasks": 244
+          "tasks": 244,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 3.8856311499653087,
-          "avgQueue": 0.5681805227143805,
+          "utilPct": 3.8398129287713703,
+          "avgQueue": 0.5497259753715436,
           "maxQueue": 5,
-          "tasks": 248
+          "tasks": 248,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 15,
       "noCollision": {
-        "avgCycleTimeS": 240.71999999999997,
-        "throughputPerHour": 260.9550728855248,
-        "avgUtilization": 0.9718846851488394,
+        "avgCycleTimeS": 241.38400000000001,
+        "throughputPerHour": 260.977805368689,
+        "avgUtilization": 0.9751590254175161,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 271.77,
-        "throughputPerHour": 231.42931750476427,
-        "avgUtilization": 0.9735465216109503,
-        "avgCollisionWaitPct": 0.10276099063638171,
+        "avgCycleTimeS": 271.918,
+        "throughputPerHour": 231.23403869090166,
+        "avgUtilization": 0.9731701361298167,
+        "avgCollisionWaitPct": 0.10302254607863706,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.128988035892323,
-      "throughputPenalty": 0.886855024298712,
+      "cycleTimePenalty": 1.1264955423723195,
+      "throughputPenalty": 0.8860295164342895,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 5.279020090396186,
-          "avgQueue": 0.7908497136779236,
+          "utilPct": 5.273899172012218,
+          "avgQueue": 0.7954645430203076,
           "maxQueue": 4,
-          "tasks": 235
+          "tasks": 235,
+          "zoneAvgBots": 5.986479641638033,
+          "zoneMaxBots": 15,
+          "gwAvgBots": 0.10258375889209566,
+          "gwMaxBots": 3
         },
         {
           "id": "op-8-0",
-          "utilPct": 5.810038140179221,
-          "avgQueue": 0.8794645416794495,
+          "utilPct": 5.804625928262544,
+          "avgQueue": 0.8554163259195837,
           "maxQueue": 5,
-          "tasks": 255
+          "tasks": 255,
+          "zoneAvgBots": 2.062412587777335,
+          "zoneMaxBots": 11,
+          "gwAvgBots": 0.09943924715929035,
+          "gwMaxBots": 3
         },
         {
           "id": "op-12-0",
-          "utilPct": 5.322347552047966,
-          "avgQueue": 0.7870477281392311,
+          "utilPct": 5.31828440745039,
+          "avgQueue": 0.7971913952316078,
           "maxQueue": 5,
-          "tasks": 238
+          "tasks": 238,
+          "zoneAvgBots": 2.190781825532297,
+          "zoneMaxBots": 9,
+          "gwAvgBots": 0.09115642742224653,
+          "gwMaxBots": 2
         },
         {
           "id": "op-16-0",
-          "utilPct": 6.038734024729392,
-          "avgQueue": 0.9265357691163226,
+          "utilPct": 6.036671499536828,
+          "avgQueue": 0.9087605330945866,
           "maxQueue": 6,
-          "tasks": 271
+          "tasks": 271,
+          "zoneAvgBots": 4.757917257149305,
+          "zoneMaxBots": 11,
+          "gwAvgBots": 0.10694770861696563,
+          "gwMaxBots": 3
         },
         {
           "id": "op-4-46",
-          "utilPct": 5.480378705337291,
-          "avgQueue": 0.8288494178633684,
+          "utilPct": 5.475960587403306,
+          "avgQueue": 0.8415564459234407,
           "maxQueue": 5,
-          "tasks": 244
+          "tasks": 244,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 5.9009328245404316,
-          "avgQueue": 0.8736609100988936,
-          "maxQueue": 5,
-          "tasks": 261
+          "utilPct": 5.9000060551136,
+          "avgQueue": 0.8933145017193358,
+          "maxQueue": 4,
+          "tasks": 261,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 5.444010737148302,
-          "avgQueue": 0.8297400002977475,
+          "utilPct": 5.433676671699656,
+          "avgQueue": 0.8478035091095704,
           "maxQueue": 5,
-          "tasks": 244
+          "tasks": 244,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 5.724682995992047,
-          "avgQueue": 0.8871058900146174,
+          "utilPct": 5.719049868418999,
+          "avgQueue": 0.8570130401384517,
           "maxQueue": 5,
-          "tasks": 252
+          "tasks": 252,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 20,
       "noCollision": {
-        "avgCycleTimeS": 228.5125,
-        "throughputPerHour": 346.83501601257586,
-        "avgUtilization": 0.9602167431436477,
+        "avgCycleTimeS": 227.80749999999998,
+        "throughputPerHour": 349.13710417973164,
+        "avgUtilization": 0.9637167183758075,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 267.647,
-        "throughputPerHour": 299.05492470151796,
-        "avgUtilization": 0.9698278706618062,
-        "avgCollisionWaitPct": 0.12748165924585325,
+        "avgCycleTimeS": 267.81800000000004,
+        "throughputPerHour": 296.1930945536035,
+        "avgUtilization": 0.961026111989747,
+        "avgCollisionWaitPct": 0.12707953052008777,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.1712575898473825,
-      "throughputPenalty": 0.8622397131051917,
+      "cycleTimePenalty": 1.1756329357022928,
+      "throughputPenalty": 0.8483575392236936,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 7.857294350911813,
-          "avgQueue": 1.1954047469387086,
+          "utilPct": 7.774252104628269,
+          "avgQueue": 1.172606012166909,
           "maxQueue": 6,
-          "tasks": 267
+          "tasks": 267,
+          "zoneAvgBots": 7.914464987099429,
+          "zoneMaxBots": 20,
+          "gwAvgBots": 0.14051722885875711,
+          "gwMaxBots": 2
         },
         {
           "id": "op-8-0",
-          "utilPct": 6.85198031195763,
-          "avgQueue": 1.0503060661204708,
+          "utilPct": 6.787307823323893,
+          "avgQueue": 1.026753296533307,
           "maxQueue": 6,
-          "tasks": 236
+          "tasks": 236,
+          "zoneAvgBots": 2.619445827111521,
+          "zoneMaxBots": 14,
+          "gwAvgBots": 0.13316015074640117,
+          "gwMaxBots": 2
         },
         {
           "id": "op-12-0",
-          "utilPct": 6.287317404294567,
-          "avgQueue": 1.0155218014476592,
-          "maxQueue": 6,
-          "tasks": 221
+          "utilPct": 6.22777203770746,
+          "avgQueue": 0.9929516770675109,
+          "maxQueue": 5,
+          "tasks": 221,
+          "zoneAvgBots": 2.936135409094242,
+          "zoneMaxBots": 9,
+          "gwAvgBots": 0.13694155808433295,
+          "gwMaxBots": 3
         },
         {
           "id": "op-16-0",
-          "utilPct": 7.806508251905521,
-          "avgQueue": 1.2591188228223205,
+          "utilPct": 7.73589028795309,
+          "avgQueue": 1.257315349394133,
           "maxQueue": 8,
-          "tasks": 269
+          "tasks": 269,
+          "zoneAvgBots": 6.5258399837148975,
+          "zoneMaxBots": 17,
+          "gwAvgBots": 0.14722642618374454,
+          "gwMaxBots": 4
         },
         {
           "id": "op-4-46",
-          "utilPct": 6.920616775038783,
-          "avgQueue": 1.0566366440927735,
-          "maxQueue": 7,
-          "tasks": 239
+          "utilPct": 6.8484328511920385,
+          "avgQueue": 1.0346628438928076,
+          "maxQueue": 5,
+          "tasks": 239,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 7.466456877945556,
-          "avgQueue": 1.1236223009681807,
+          "utilPct": 7.392695162361091,
+          "avgQueue": 1.1232997220029743,
           "maxQueue": 7,
-          "tasks": 253
+          "tasks": 253,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 7.884359712785413,
-          "avgQueue": 1.2634578725874477,
+          "utilPct": 7.822595084574468,
+          "avgQueue": 1.2649121359269382,
           "maxQueue": 6,
-          "tasks": 274
+          "tasks": 274,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 7.075035007122537,
-          "avgQueue": 1.0922693576470643,
+          "utilPct": 7.004156367015916,
+          "avgQueue": 1.0839920016157532,
           "maxQueue": 5,
-          "tasks": 241
+          "tasks": 241,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 30,
       "noCollision": {
-        "avgCycleTimeS": 216.654,
-        "throughputPerHour": 511.00695207234656,
-        "avgUtilization": 0.9357067383393624,
+        "avgCycleTimeS": 215.41500000000002,
+        "throughputPerHour": 520.1485488985961,
+        "avgUtilization": 0.9467887575528747,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 268.53249999999997,
-        "throughputPerHour": 420.7865497324864,
-        "avgUtilization": 0.9552304486954555,
-        "avgCollisionWaitPct": 0.16430831904123927,
+        "avgCycleTimeS": 271.639,
+        "throughputPerHour": 414.79554261850654,
+        "avgUtilization": 0.952562392499716,
+        "avgCollisionWaitPct": 0.16514469144610294,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.239453229573421,
-      "throughputPenalty": 0.8234458416387903,
+      "cycleTimePenalty": 1.2610031799085486,
+      "throughputPenalty": 0.7974559258058638,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 9.074699936923048,
-          "avgQueue": 1.4651090855530247,
+          "utilPct": 8.943218550966469,
+          "avgQueue": 1.4497261514564679,
           "maxQueue": 6,
-          "tasks": 224
+          "tasks": 224,
+          "zoneAvgBots": 12.05995379679845,
+          "zoneMaxBots": 30,
+          "gwAvgBots": 0.21089544236550867,
+          "gwMaxBots": 3
         },
         {
           "id": "op-8-0",
-          "utilPct": 10.734395130329059,
-          "avgQueue": 1.6967223219862817,
+          "utilPct": 10.581026747989473,
+          "avgQueue": 1.7352732452646973,
           "maxQueue": 8,
-          "tasks": 261
+          "tasks": 261,
+          "zoneAvgBots": 4.385714321396818,
+          "zoneMaxBots": 19,
+          "gwAvgBots": 0.2596310613856341,
+          "gwMaxBots": 3
         },
         {
           "id": "op-12-0",
-          "utilPct": 10.776855097950104,
-          "avgQueue": 1.7773675534331814,
-          "maxQueue": 7,
-          "tasks": 264
+          "utilPct": 10.624080200716522,
+          "avgQueue": 1.7534527294155393,
+          "maxQueue": 6,
+          "tasks": 264,
+          "zoneAvgBots": 4.548980375050903,
+          "zoneMaxBots": 14,
+          "gwAvgBots": 0.25505464727604316,
+          "gwMaxBots": 3
         },
         {
           "id": "op-16-0",
-          "utilPct": 10.425897703184068,
-          "avgQueue": 1.7196800423417138,
+          "utilPct": 10.278505470446525,
+          "avgQueue": 1.7400819221392543,
           "maxQueue": 7,
-          "tasks": 253
+          "tasks": 253,
+          "zoneAvgBots": 8.996709932949276,
+          "zoneMaxBots": 18,
+          "gwAvgBots": 0.2254368435024962,
+          "gwMaxBots": 3
         },
         {
           "id": "op-4-46",
-          "utilPct": 9.215956305452504,
-          "avgQueue": 1.5022571170463637,
+          "utilPct": 9.080216939612935,
+          "avgQueue": 1.489396256830044,
           "maxQueue": 8,
-          "tasks": 225
+          "tasks": 225,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 10.279461600042413,
-          "avgQueue": 1.7678577606402057,
-          "maxQueue": 6,
-          "tasks": 257
+          "utilPct": 10.13812053662333,
+          "avgQueue": 1.7848211638042628,
+          "maxQueue": 7,
+          "tasks": 257,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 11.381204468812403,
-          "avgQueue": 1.938304149559519,
+          "utilPct": 11.220613622475145,
+          "avgQueue": 1.9245554831495872,
           "maxQueue": 9,
-          "tasks": 275
+          "tasks": 275,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 9.93113664973431,
-          "avgQueue": 1.6336505301732178,
-          "maxQueue": 6,
-          "tasks": 241
+          "utilPct": 9.788906773656981,
+          "avgQueue": 1.6530437342270468,
+          "maxQueue": 8,
+          "tasks": 241,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 40,
       "noCollision": {
-        "avgCycleTimeS": 211.4255,
-        "throughputPerHour": 674.9769551891228,
-        "avgUtilization": 0.9253308508813853,
+        "avgCycleTimeS": 212.13299999999998,
+        "throughputPerHour": 674.5598500472358,
+        "avgUtilization": 0.9282378131595472,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 279.041,
-        "throughputPerHour": 517.4080449311574,
-        "avgUtilization": 0.936526588319493,
-        "avgCollisionWaitPct": 0.1865001765313759,
+        "avgCycleTimeS": 278.892,
+        "throughputPerHour": 514.3363181294689,
+        "avgUtilization": 0.9302578504446183,
+        "avgCollisionWaitPct": 0.18807362867699626,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.3198076863954442,
-      "throughputPenalty": 0.7665566075306735,
+      "cycleTimePenalty": 1.3147035114762908,
+      "throughputPenalty": 0.7624769219416967,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 12.565375809170249,
-          "avgQueue": 2.2227624370886234,
+          "utilPct": 12.518549676111265,
+          "avgQueue": 2.2831556373489663,
           "maxQueue": 10,
-          "tasks": 251
+          "tasks": 251,
+          "zoneAvgBots": 16.21012965636923,
+          "zoneMaxBots": 40,
+          "gwAvgBots": 0.34409771354968194,
+          "gwMaxBots": 3
         },
         {
           "id": "op-8-0",
-          "utilPct": 12.430408449098987,
-          "avgQueue": 2.192000839418456,
+          "utilPct": 12.345228271195529,
+          "avgQueue": 2.2251195942520394,
           "maxQueue": 7,
-          "tasks": 247
+          "tasks": 247,
+          "zoneAvgBots": 5.626089058796465,
+          "zoneMaxBots": 26,
+          "gwAvgBots": 0.33922164099029395,
+          "gwMaxBots": 4
         },
         {
           "id": "op-12-0",
-          "utilPct": 13.147215585737268,
-          "avgQueue": 2.3661628099298477,
+          "utilPct": 13.049550151465914,
+          "avgQueue": 2.326963231758851,
           "maxQueue": 9,
-          "tasks": 258
+          "tasks": 258,
+          "zoneAvgBots": 6.120234218109357,
+          "zoneMaxBots": 19,
+          "gwAvgBots": 0.3213179053299052,
+          "gwMaxBots": 4
         },
         {
           "id": "op-16-0",
-          "utilPct": 13.42010604052889,
-          "avgQueue": 2.3441779667860776,
-          "maxQueue": 9,
-          "tasks": 264
+          "utilPct": 13.343835187493244,
+          "avgQueue": 2.3425484564774512,
+          "maxQueue": 10,
+          "tasks": 264,
+          "zoneAvgBots": 12.029259946776909,
+          "zoneMaxBots": 24,
+          "gwAvgBots": 0.35330218253676293,
+          "gwMaxBots": 3
         },
         {
           "id": "op-4-46",
-          "utilPct": 12.317029026805523,
-          "avgQueue": 2.193984301649162,
+          "utilPct": 12.236306708882546,
+          "avgQueue": 2.24900092926991,
           "maxQueue": 8,
-          "tasks": 247
+          "tasks": 247,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 12.60772710474357,
-          "avgQueue": 2.2372365007767203,
-          "maxQueue": 7,
-          "tasks": 252
+          "utilPct": 12.541859680319233,
+          "avgQueue": 2.190632910885621,
+          "maxQueue": 10,
+          "tasks": 252,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 12.138386335553212,
-          "avgQueue": 2.2127390290263707,
+          "utilPct": 12.063178062002379,
+          "avgQueue": 2.1438958759942635,
           "maxQueue": 13,
-          "tasks": 242
+          "tasks": 242,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 11.980871496087342,
-          "avgQueue": 2.1258410171459197,
-          "maxQueue": 7,
-          "tasks": 239
+          "utilPct": 11.911331898815497,
+          "avgQueue": 2.0619214880683208,
+          "maxQueue": 6,
+          "tasks": 239,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 50,
       "noCollision": {
-        "avgCycleTimeS": 205.80249999999995,
-        "throughputPerHour": 826.7068622551275,
-        "avgUtilization": 0.8953465262892936,
+        "avgCycleTimeS": 205.85,
+        "throughputPerHour": 826.0599228910484,
+        "avgUtilization": 0.8950258581002737,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 284.9745,
-        "throughputPerHour": 613.0766634945775,
-        "avgUtilization": 0.9193472670095121,
-        "avgCollisionWaitPct": 0.20731748169106218,
+        "avgCycleTimeS": 283.19399999999996,
+        "throughputPerHour": 618.5948694540888,
+        "avgUtilization": 0.9222612200737581,
+        "avgCollisionWaitPct": 0.20499093895749096,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.3846989225106596,
-      "throughputPenalty": 0.7415889373679564,
+      "cycleTimePenalty": 1.375729900412922,
+      "throughputPenalty": 0.7488498743397786,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 17.092108626506494,
-          "avgQueue": 3.2015028375774586,
+          "utilPct": 17.26320701676168,
+          "avgQueue": 3.137456330160707,
           "maxQueue": 11,
-          "tasks": 289
+          "tasks": 289,
+          "zoneAvgBots": 20.52419806013528,
+          "zoneMaxBots": 45,
+          "gwAvgBots": 0.4881954123350529,
+          "gwMaxBots": 4
         },
         {
           "id": "op-8-0",
-          "utilPct": 14.670010764687532,
-          "avgQueue": 2.8909766693069043,
+          "utilPct": 14.806955249776408,
+          "avgQueue": 2.9260950651976665,
           "maxQueue": 8,
-          "tasks": 246
+          "tasks": 246,
+          "zoneAvgBots": 7.42992769206797,
+          "zoneMaxBots": 26,
+          "gwAvgBots": 0.4501391206235363,
+          "gwMaxBots": 4
         },
         {
           "id": "op-12-0",
-          "utilPct": 15.916221352232046,
-          "avgQueue": 2.920332446984631,
+          "utilPct": 16.074746053909838,
+          "avgQueue": 2.860981251708826,
           "maxQueue": 10,
-          "tasks": 266
+          "tasks": 266,
+          "zoneAvgBots": 7.922623986637888,
+          "zoneMaxBots": 23,
+          "gwAvgBots": 0.4703565372869821,
+          "gwMaxBots": 4
         },
         {
           "id": "op-16-0",
-          "utilPct": 14.262598578077199,
-          "avgQueue": 2.583928811115869,
-          "maxQueue": 8,
-          "tasks": 234
+          "utilPct": 14.357653434353683,
+          "avgQueue": 2.5556000585895964,
+          "maxQueue": 9,
+          "tasks": 234,
+          "zoneAvgBots": 14.101771272636153,
+          "zoneMaxBots": 31,
+          "gwAvgBots": 0.43805211901202307,
+          "gwMaxBots": 4
         },
         {
           "id": "op-4-46",
-          "utilPct": 13.923301013161923,
-          "avgQueue": 2.582866543918861,
+          "utilPct": 14.07483107174534,
+          "avgQueue": 2.5793770394746103,
           "maxQueue": 8,
-          "tasks": 236
+          "tasks": 236,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 13.637138404352694,
-          "avgQueue": 2.5897853538976063,
-          "maxQueue": 10,
-          "tasks": 229
+          "utilPct": 13.7385367001969,
+          "avgQueue": 2.59301853068994,
+          "maxQueue": 8,
+          "tasks": 229,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 14.409715791512443,
-          "avgQueue": 2.669834449594491,
+          "utilPct": 14.55324957726476,
+          "avgQueue": 2.6649099555274476,
           "maxQueue": 9,
-          "tasks": 245
+          "tasks": 245,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 15.298256704526418,
-          "avgQueue": 2.765740668381547,
-          "maxQueue": 9,
-          "tasks": 255
+          "utilPct": 15.41315662317533,
+          "avgQueue": 2.9115106152819683,
+          "maxQueue": 10,
+          "tasks": 255,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 75,
       "noCollision": {
-        "avgCycleTimeS": 200.16649999999998,
-        "throughputPerHour": 1199.3219343507724,
-        "avgUtilization": 0.8588709921893519,
+        "avgCycleTimeS": 200.34050000000002,
+        "throughputPerHour": 1207.070619684764,
+        "avgUtilization": 0.8651544908653752,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 304.40649999999994,
-        "throughputPerHour": 822.5025041950664,
-        "avgUtilization": 0.8955224873308436,
-        "avgCollisionWaitPct": 0.2413376592353768,
+        "avgCycleTimeS": 304.873,
+        "throughputPerHour": 817.1763452451012,
+        "avgUtilization": 0.891005974424712,
+        "avgCollisionWaitPct": 0.24094045649448512,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.520766461920451,
-      "throughputPenalty": 0.6858062715581957,
+      "cycleTimePenalty": 1.5217741794594701,
+      "throughputPenalty": 0.6769913308456743,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 20.225516940563885,
-          "avgQueue": 4.007901378886895,
+          "utilPct": 20.05698343418393,
+          "avgQueue": 3.9848793904928614,
           "maxQueue": 10,
-          "tasks": 252
+          "tasks": 252,
+          "zoneAvgBots": 27.645140775449867,
+          "zoneMaxBots": 53,
+          "gwAvgBots": 0.7123754184147708,
+          "gwMaxBots": 4
         },
         {
           "id": "op-8-0",
-          "utilPct": 19.979182381705318,
-          "avgQueue": 4.246032867697642,
-          "maxQueue": 13,
-          "tasks": 251
+          "utilPct": 19.86684635977499,
+          "avgQueue": 4.1392576734901265,
+          "maxQueue": 12,
+          "tasks": 251,
+          "zoneAvgBots": 12.503459293052932,
+          "zoneMaxBots": 36,
+          "gwAvgBots": 0.7727864689681436,
+          "gwMaxBots": 6
         },
         {
           "id": "op-12-0",
-          "utilPct": 18.436982527701208,
-          "avgQueue": 3.6614762822214018,
+          "utilPct": 18.31168699087911,
+          "avgQueue": 3.699294808932686,
           "maxQueue": 11,
-          "tasks": 230
+          "tasks": 230,
+          "zoneAvgBots": 12.216298958215575,
+          "zoneMaxBots": 35,
+          "gwAvgBots": 0.726754234863957,
+          "gwMaxBots": 5
         },
         {
           "id": "op-16-0",
-          "utilPct": 19.75506621615825,
-          "avgQueue": 3.9517008841441266,
+          "utilPct": 19.613880325380173,
+          "avgQueue": 4.059904050957053,
           "maxQueue": 12,
-          "tasks": 249
+          "tasks": 249,
+          "zoneAvgBots": 22.592539705300105,
+          "zoneMaxBots": 36,
+          "gwAvgBots": 0.7117345457347125,
+          "gwMaxBots": 5
         },
         {
           "id": "op-4-46",
-          "utilPct": 19.05089443018415,
-          "avgQueue": 3.846777429706132,
+          "utilPct": 18.9190627526368,
+          "avgQueue": 3.8760452084525503,
           "maxQueue": 11,
-          "tasks": 237
+          "tasks": 237,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 21.617504643403798,
-          "avgQueue": 4.51375628339453,
+          "utilPct": 21.522121076082232,
+          "avgQueue": 4.581656247338628,
           "maxQueue": 21,
-          "tasks": 268
+          "tasks": 268,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 22.06173304573756,
-          "avgQueue": 4.585081261589528,
+          "utilPct": 21.901418964286755,
+          "avgQueue": 4.6141263521049085,
           "maxQueue": 13,
-          "tasks": 278
+          "tasks": 278,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 18.804162296919873,
-          "avgQueue": 3.8824425916866225,
+          "utilPct": 18.703400561101226,
+          "avgQueue": 3.8283166921083547,
           "maxQueue": 15,
-          "tasks": 235
+          "tasks": 235,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 100,
       "noCollision": {
-        "avgCycleTimeS": 195.557,
-        "throughputPerHour": 1540.9370111086814,
-        "avgUtilization": 0.8169391776798939,
+        "avgCycleTimeS": 195.66150000000002,
+        "throughputPerHour": 1507.1576990488659,
+        "avgUtilization": 0.7994706327480349,
         "avgCollisionWaitPct": 0,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 316.50300000000004,
-        "throughputPerHour": 992.1891466556029,
-        "avgUtilization": 0.8509177445139067,
-        "avgCollisionWaitPct": 0.2610348469574271,
+        "avgCycleTimeS": 314.80949999999996,
+        "throughputPerHour": 996.3065429963108,
+        "avgUtilization": 0.849722556086687,
+        "avgCollisionWaitPct": 0.2603985371753046,
         "totalTasks": 2000,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.6184692953972502,
-      "throughputPenalty": 0.6438868944693187,
+      "cycleTimePenalty": 1.6089496400671564,
+      "throughputPenalty": 0.6610499641975475,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 24.434978104915523,
-          "avgQueue": 5.145441870345751,
+          "utilPct": 24.548034473204915,
+          "avgQueue": 5.2723003139687545,
           "maxQueue": 17,
-          "tasks": 253
+          "tasks": 253,
+          "zoneAvgBots": 38.05159330297792,
+          "zoneMaxBots": 59,
+          "gwAvgBots": 1.0859019535598793,
+          "gwMaxBots": 5
         },
         {
           "id": "op-8-0",
-          "utilPct": 23.443722612032918,
-          "avgQueue": 5.288400185708551,
+          "utilPct": 23.548311828414906,
+          "avgQueue": 5.148394119066305,
           "maxQueue": 17,
-          "tasks": 244
+          "tasks": 244,
+          "zoneAvgBots": 17.68774914550585,
+          "zoneMaxBots": 46,
+          "gwAvgBots": 0.9958143176871461,
+          "gwMaxBots": 6
         },
         {
           "id": "op-12-0",
-          "utilPct": 24.197550025076573,
-          "avgQueue": 5.372332629759457,
+          "utilPct": 24.30253851951333,
+          "avgQueue": 5.293869295550861,
           "maxQueue": 17,
-          "tasks": 250
+          "tasks": 250,
+          "zoneAvgBots": 17.612416495467073,
+          "zoneMaxBots": 40,
+          "gwAvgBots": 0.9498233273739123,
+          "gwMaxBots": 6
         },
         {
           "id": "op-16-0",
-          "utilPct": 22.78225428082111,
-          "avgQueue": 4.6270230413837385,
+          "utilPct": 22.87478215710273,
+          "avgQueue": 4.597468697285366,
           "maxQueue": 14,
-          "tasks": 237
+          "tasks": 237,
+          "zoneAvgBots": 26.579053101674408,
+          "zoneMaxBots": 49,
+          "gwAvgBots": 1.016834717020949,
+          "gwMaxBots": 6
         },
         {
           "id": "op-4-46",
-          "utilPct": 25.026093323062042,
-          "avgQueue": 5.532495291893643,
+          "utilPct": 25.11870536850186,
+          "avgQueue": 5.306695207312659,
           "maxQueue": 16,
-          "tasks": 257
+          "tasks": 257,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 23.799088694114214,
-          "avgQueue": 5.478238614160132,
+          "utilPct": 23.895633465562092,
+          "avgQueue": 5.454217653146392,
           "maxQueue": 16,
-          "tasks": 248
+          "tasks": 248,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 22.877209980023654,
-          "avgQueue": 4.930050657298814,
+          "utilPct": 22.963203549431768,
+          "avgQueue": 5.057223332361137,
           "maxQueue": 13,
-          "tasks": 237
+          "tasks": 237,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 26.364770385210097,
-          "avgQueue": 5.716816352047244,
+          "utilPct": 26.47506288755103,
+          "avgQueue": 5.822136610808275,
           "maxQueue": 20,
-          "tasks": 274
+          "tasks": 274,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 150,
       "noCollision": {
-        "avgCycleTimeS": 187.06316572450518,
-        "throughputPerHour": 423.91823157894726,
-        "avgUtilization": 0.1536221187115665,
+        "avgCycleTimeS": 187.86223370936858,
+        "throughputPerHour": 454.2762583072099,
+        "avgUtilization": 0.16577624766091043,
         "avgCollisionWaitPct": 0,
         "totalTasks": 1992,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 336.10075187969926,
-        "throughputPerHour": 3.5909999999999997,
-        "avgUtilization": 0.00885582666666667,
-        "avgCollisionWaitPct": 0.09185019844422632,
-        "totalTasks": 1995,
+        "avgCycleTimeS": 337.3606680520396,
+        "throughputPerHour": 485.3008590514294,
+        "avgUtilization": 0.3047724572114548,
+        "avgCollisionWaitPct": 0.16372917933956516,
+        "totalTasks": 1996,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.7967233184468139,
-      "throughputPenalty": 0.008470973250253427,
+      "cycleTimePenalty": 1.7957875906764311,
+      "throughputPenalty": 1.0682945678469482,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 0.09240000000000001,
-          "avgQueue": 0.023285500000000004,
+          "utilPct": 11.97008767820516,
+          "avgQueue": 3.2408833114296085,
           "maxQueue": 23,
-          "tasks": 264
+          "tasks": 266,
+          "zoneAvgBots": 46.991336174879514,
+          "zoneMaxBots": 78,
+          "gwAvgBots": 0.6167414265317835,
+          "gwMaxBots": 7
         },
         {
           "id": "op-8-0",
-          "utilPct": 0.0821,
-          "avgQueue": 0.0203575,
+          "utilPct": 10.976777854025812,
+          "avgQueue": 2.726460189338499,
           "maxQueue": 20,
-          "tasks": 236
+          "tasks": 237,
+          "zoneAvgBots": 32.963906237349434,
+          "zoneMaxBots": 61,
+          "gwAvgBots": 0.5098315729702125,
+          "gwMaxBots": 6
         },
         {
           "id": "op-12-0",
-          "utilPct": 0.08859999999999998,
-          "avgQueue": 0.0198505,
+          "utilPct": 12.468212851029348,
+          "avgQueue": 2.8517309982654275,
           "maxQueue": 24,
-          "tasks": 251
+          "tasks": 248,
+          "zoneAvgBots": 32.4453605682645,
+          "zoneMaxBots": 70,
+          "gwAvgBots": 0.5022403846277211,
+          "gwMaxBots": 6
         },
         {
           "id": "op-16-0",
-          "utilPct": 0.08559999999999998,
-          "avgQueue": 0.019081499999999998,
+          "utilPct": 11.997785571396015,
+          "avgQueue": 2.7286017505971825,
           "maxQueue": 18,
-          "tasks": 245
+          "tasks": 245,
+          "zoneAvgBots": 37.5490690966887,
+          "zoneMaxBots": 57,
+          "gwAvgBots": 0.5716542166105357,
+          "gwMaxBots": 8
         },
         {
           "id": "op-4-46",
-          "utilPct": 0.0935,
-          "avgQueue": 0.022302500000000003,
+          "utilPct": 13.148222711503886,
+          "avgQueue": 3.3081085374726733,
           "maxQueue": 25,
-          "tasks": 266
+          "tasks": 265,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 0.08330000000000001,
-          "avgQueue": 0.021412499999999998,
+          "utilPct": 11.098002498459564,
+          "avgQueue": 2.6338846123715953,
           "maxQueue": 24,
-          "tasks": 239
+          "tasks": 238,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 0.08320000000000001,
-          "avgQueue": 0.020281,
+          "utilPct": 10.587411843204782,
+          "avgQueue": 2.3236885059591637,
           "maxQueue": 20,
-          "tasks": 240
+          "tasks": 241,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 0.08979999999999999,
-          "avgQueue": 0.020203500000000003,
+          "utilPct": 12.117754918842268,
+          "avgQueue": 2.8063994169557622,
           "maxQueue": 31,
-          "tasks": 254
+          "tasks": 256,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     },
     {
       "botCount": 200,
       "noCollision": {
-        "avgCycleTimeS": 180.09658987350764,
-        "throughputPerHour": 2.6406,
-        "avgUtilization": 0.5334231774999992,
+        "avgCycleTimeS": 179.70355900831387,
+        "throughputPerHour": 2.6117999999999997,
+        "avgUtilization": 0.5494072574999993,
         "avgCollisionWaitPct": 0,
-        "totalTasks": 1467,
+        "totalTasks": 1451,
         "shiftsRun": 5
       },
       "cooperativeAStar": {
-        "avgCycleTimeS": 350.6914361115105,
-        "throughputPerHour": 2.3796,
-        "avgUtilization": 0.6785524399999999,
-        "avgCollisionWaitPct": 0.0007337872445070737,
-        "totalTasks": 1322,
+        "avgCycleTimeS": 350.0830902190875,
+        "throughputPerHour": 2.3345999999999996,
+        "avgUtilization": 0.7034994324999999,
+        "avgCollisionWaitPct": 0.0006961975114406948,
+        "totalTasks": 1297,
         "shiftsRun": 5
       },
-      "cycleTimePenalty": 1.9472408464692283,
-      "throughputPenalty": 0.9011588275391956,
+      "cycleTimePenalty": 1.9481143954577502,
+      "throughputPenalty": 0.8938662991040661,
       "stationCongestion": [
         {
           "id": "op-4-0",
-          "utilPct": 0.0603,
-          "avgQueue": 0.015265500000000001,
+          "utilPct": 0.055200000000000006,
+          "avgQueue": 0.0144215,
           "maxQueue": 32,
-          "tasks": 163
+          "tasks": 146,
+          "zoneAvgBots": 67.0000435,
+          "zoneMaxBots": 85,
+          "gwAvgBots": 0.0025405000000000002,
+          "gwMaxBots": 8
         },
         {
           "id": "op-8-0",
-          "utilPct": 0.059899999999999995,
-          "avgQueue": 0.016064500000000002,
+          "utilPct": 0.0596,
+          "avgQueue": 0.0158825,
           "maxQueue": 29,
-          "tasks": 159
+          "tasks": 158,
+          "zoneAvgBots": 38.804096,
+          "zoneMaxBots": 80,
+          "gwAvgBots": 0.00269,
+          "gwMaxBots": 10
         },
         {
           "id": "op-12-0",
-          "utilPct": 0.06620000000000001,
-          "avgQueue": 0.015667999999999998,
+          "utilPct": 0.0626,
+          "avgQueue": 0.014499500000000002,
           "maxQueue": 31,
-          "tasks": 176
+          "tasks": 164,
+          "zoneAvgBots": 21.2216605,
+          "zoneMaxBots": 85,
+          "gwAvgBots": 0.002667,
+          "gwMaxBots": 7
         },
         {
           "id": "op-16-0",
-          "utilPct": 0.0615,
-          "avgQueue": 0.013219999999999999,
+          "utilPct": 0.0603,
+          "avgQueue": 0.013215,
           "maxQueue": 28,
-          "tasks": 164
+          "tasks": 160,
+          "zoneAvgBots": 72.9742,
+          "zoneMaxBots": 91,
+          "gwAvgBots": 0.0030885,
+          "gwMaxBots": 10
         },
         {
           "id": "op-4-46",
-          "utilPct": 0.05059999999999999,
-          "avgQueue": 0.012184500000000001,
+          "utilPct": 0.05449999999999999,
+          "avgQueue": 0.0131995,
           "maxQueue": 28,
-          "tasks": 132
+          "tasks": 145,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-8-46",
-          "utilPct": 0.0693,
-          "avgQueue": 0.0188275,
+          "utilPct": 0.0684,
+          "avgQueue": 0.0183935,
           "maxQueue": 34,
-          "tasks": 183
+          "tasks": 180,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-12-46",
-          "utilPct": 0.0621,
-          "avgQueue": 0.014316,
+          "utilPct": 0.0603,
+          "avgQueue": 0.013593,
           "maxQueue": 28,
-          "tasks": 167
+          "tasks": 161,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         },
         {
           "id": "op-16-46",
-          "utilPct": 0.06670000000000001,
-          "avgQueue": 0.0144785,
+          "utilPct": 0.0682,
+          "avgQueue": 0.014843499999999999,
           "maxQueue": 34,
-          "tasks": 178
+          "tasks": 183,
+          "zoneAvgBots": 0,
+          "zoneMaxBots": 0,
+          "gwAvgBots": 0,
+          "gwMaxBots": 0
         }
       ]
     }
