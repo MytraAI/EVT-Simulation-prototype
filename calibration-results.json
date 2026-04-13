@@ -1,0 +1,960 @@
+{
+  "metadata": {
+    "timestamp": "2026-04-12T09:23:54-07:00",
+    "mapPath": "app/public/grainger-pilot-04102026-graph.json",
+    "shiftsPerSample": 5,
+    "palletCountPerShift": 400,
+    "totalTimeS": 116.419078327,
+    "workers": 22
+  },
+  "samples": [
+    {
+      "botCount": 2,
+      "noCollision": {
+        "avgCycleTimeS": 506.3585,
+        "throughputPerHour": 35.29170981773164,
+        "avgUtilization": 0.9933099389261344,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 514.2305,
+        "throughputPerHour": 34.75147765848138,
+        "avgUtilization": 0.9938010349137658,
+        "avgCollisionWaitPct": 0.010485356291449002,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.0155462977317453,
+      "throughputPenalty": 0.9846923778405648,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 0.8937101397686954,
+          "avgQueue": 0.1177474545684118,
+          "maxQueue": 2,
+          "tasks": 262
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 0.7745956151790857,
+          "avgQueue": 0.10788995262628676,
+          "maxQueue": 2,
+          "tasks": 228
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 0.8512415830983912,
+          "avgQueue": 0.11975117569909513,
+          "maxQueue": 2,
+          "tasks": 256
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 0.9311968194049666,
+          "avgQueue": 0.12326254068375267,
+          "maxQueue": 2,
+          "tasks": 271
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 0.831651799642333,
+          "avgQueue": 0.1117726818536019,
+          "maxQueue": 2,
+          "tasks": 248
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 0.8758552601756205,
+          "avgQueue": 0.1212981102719604,
+          "maxQueue": 2,
+          "tasks": 262
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 0.786914843396308,
+          "avgQueue": 0.10926884523493477,
+          "maxQueue": 2,
+          "tasks": 232
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 0.8120657062615347,
+          "avgQueue": 0.11079643762621671,
+          "maxQueue": 2,
+          "tasks": 241
+        }
+      ]
+    },
+    {
+      "botCount": 5,
+      "noCollision": {
+        "avgCycleTimeS": 320.6075,
+        "throughputPerHour": 88.67191374942747,
+        "avgUtilization": 0.9883403864736561,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 334.4845,
+        "throughputPerHour": 84.90781003275399,
+        "avgUtilization": 0.9880383566035704,
+        "avgCollisionWaitPct": 0.03999648913356305,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.0432834540676685,
+      "throughputPenalty": 0.9575502145210236,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 1.900818358715012,
+          "avgQueue": 0.2662853612566481,
+          "maxQueue": 3,
+          "tasks": 229
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 2.0629173997999795,
+          "avgQueue": 0.2906911802015581,
+          "maxQueue": 4,
+          "tasks": 254
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 2.147297934961931,
+          "avgQueue": 0.3042934511365898,
+          "maxQueue": 3,
+          "tasks": 260
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 1.9235322760065237,
+          "avgQueue": 0.26492626949732817,
+          "maxQueue": 3,
+          "tasks": 229
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 1.99898308600731,
+          "avgQueue": 0.2708227936590687,
+          "maxQueue": 4,
+          "tasks": 243
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 2.127992664154367,
+          "avgQueue": 0.29959554478705475,
+          "maxQueue": 3,
+          "tasks": 260
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 2.2240103494118286,
+          "avgQueue": 0.3044631439688297,
+          "maxQueue": 3,
+          "tasks": 268
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 2.1242998817563237,
+          "avgQueue": 0.2896758846864915,
+          "maxQueue": 4,
+          "tasks": 257
+        }
+      ]
+    },
+    {
+      "botCount": 10,
+      "noCollision": {
+        "avgCycleTimeS": 261.2165,
+        "throughputPerHour": 175.29545917791103,
+        "avgUtilization": 0.9806552147569741,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 281.2185,
+        "throughputPerHour": 162.77829959767638,
+        "avgUtilization": 0.9811087889905694,
+        "avgCollisionWaitPct": 0.07220772233402253,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.076572498291647,
+      "throughputPenalty": 0.9285939314176375,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 4.152762565732741,
+          "avgQueue": 0.5768182680614136,
+          "maxQueue": 4,
+          "tasks": 262
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 3.7335186590592877,
+          "avgQueue": 0.5412927918202053,
+          "maxQueue": 4,
+          "tasks": 236
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 4.072041819671929,
+          "avgQueue": 0.5883268921738125,
+          "maxQueue": 5,
+          "tasks": 253
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 3.814148866515108,
+          "avgQueue": 0.5393860758058466,
+          "maxQueue": 4,
+          "tasks": 244
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 3.887339777199201,
+          "avgQueue": 0.5470129229933087,
+          "maxQueue": 3,
+          "tasks": 245
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 4.228980303980122,
+          "avgQueue": 0.5965724641990517,
+          "maxQueue": 5,
+          "tasks": 268
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 3.8769128907578123,
+          "avgQueue": 0.5564314613289895,
+          "maxQueue": 5,
+          "tasks": 244
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 3.8856311499653087,
+          "avgQueue": 0.5681805227143805,
+          "maxQueue": 5,
+          "tasks": 248
+        }
+      ]
+    },
+    {
+      "botCount": 15,
+      "noCollision": {
+        "avgCycleTimeS": 240.71999999999997,
+        "throughputPerHour": 260.9550728855248,
+        "avgUtilization": 0.9718846851488394,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 271.77,
+        "throughputPerHour": 231.42931750476427,
+        "avgUtilization": 0.9735465216109503,
+        "avgCollisionWaitPct": 0.10276099063638171,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.128988035892323,
+      "throughputPenalty": 0.886855024298712,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 5.279020090396186,
+          "avgQueue": 0.7908497136779236,
+          "maxQueue": 4,
+          "tasks": 235
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 5.810038140179221,
+          "avgQueue": 0.8794645416794495,
+          "maxQueue": 5,
+          "tasks": 255
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 5.322347552047966,
+          "avgQueue": 0.7870477281392311,
+          "maxQueue": 5,
+          "tasks": 238
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 6.038734024729392,
+          "avgQueue": 0.9265357691163226,
+          "maxQueue": 6,
+          "tasks": 271
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 5.480378705337291,
+          "avgQueue": 0.8288494178633684,
+          "maxQueue": 5,
+          "tasks": 244
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 5.9009328245404316,
+          "avgQueue": 0.8736609100988936,
+          "maxQueue": 5,
+          "tasks": 261
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 5.444010737148302,
+          "avgQueue": 0.8297400002977475,
+          "maxQueue": 5,
+          "tasks": 244
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 5.724682995992047,
+          "avgQueue": 0.8871058900146174,
+          "maxQueue": 5,
+          "tasks": 252
+        }
+      ]
+    },
+    {
+      "botCount": 20,
+      "noCollision": {
+        "avgCycleTimeS": 228.5125,
+        "throughputPerHour": 346.83501601257586,
+        "avgUtilization": 0.9602167431436477,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 267.647,
+        "throughputPerHour": 299.05492470151796,
+        "avgUtilization": 0.9698278706618062,
+        "avgCollisionWaitPct": 0.12748165924585325,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.1712575898473825,
+      "throughputPenalty": 0.8622397131051917,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 7.857294350911813,
+          "avgQueue": 1.1954047469387086,
+          "maxQueue": 6,
+          "tasks": 267
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 6.85198031195763,
+          "avgQueue": 1.0503060661204708,
+          "maxQueue": 6,
+          "tasks": 236
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 6.287317404294567,
+          "avgQueue": 1.0155218014476592,
+          "maxQueue": 6,
+          "tasks": 221
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 7.806508251905521,
+          "avgQueue": 1.2591188228223205,
+          "maxQueue": 8,
+          "tasks": 269
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 6.920616775038783,
+          "avgQueue": 1.0566366440927735,
+          "maxQueue": 7,
+          "tasks": 239
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 7.466456877945556,
+          "avgQueue": 1.1236223009681807,
+          "maxQueue": 7,
+          "tasks": 253
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 7.884359712785413,
+          "avgQueue": 1.2634578725874477,
+          "maxQueue": 6,
+          "tasks": 274
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 7.075035007122537,
+          "avgQueue": 1.0922693576470643,
+          "maxQueue": 5,
+          "tasks": 241
+        }
+      ]
+    },
+    {
+      "botCount": 30,
+      "noCollision": {
+        "avgCycleTimeS": 216.654,
+        "throughputPerHour": 511.00695207234656,
+        "avgUtilization": 0.9357067383393624,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 268.53249999999997,
+        "throughputPerHour": 420.7865497324864,
+        "avgUtilization": 0.9552304486954555,
+        "avgCollisionWaitPct": 0.16430831904123927,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.239453229573421,
+      "throughputPenalty": 0.8234458416387903,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 9.074699936923048,
+          "avgQueue": 1.4651090855530247,
+          "maxQueue": 6,
+          "tasks": 224
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 10.734395130329059,
+          "avgQueue": 1.6967223219862817,
+          "maxQueue": 8,
+          "tasks": 261
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 10.776855097950104,
+          "avgQueue": 1.7773675534331814,
+          "maxQueue": 7,
+          "tasks": 264
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 10.425897703184068,
+          "avgQueue": 1.7196800423417138,
+          "maxQueue": 7,
+          "tasks": 253
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 9.215956305452504,
+          "avgQueue": 1.5022571170463637,
+          "maxQueue": 8,
+          "tasks": 225
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 10.279461600042413,
+          "avgQueue": 1.7678577606402057,
+          "maxQueue": 6,
+          "tasks": 257
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 11.381204468812403,
+          "avgQueue": 1.938304149559519,
+          "maxQueue": 9,
+          "tasks": 275
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 9.93113664973431,
+          "avgQueue": 1.6336505301732178,
+          "maxQueue": 6,
+          "tasks": 241
+        }
+      ]
+    },
+    {
+      "botCount": 40,
+      "noCollision": {
+        "avgCycleTimeS": 211.4255,
+        "throughputPerHour": 674.9769551891228,
+        "avgUtilization": 0.9253308508813853,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 279.041,
+        "throughputPerHour": 517.4080449311574,
+        "avgUtilization": 0.936526588319493,
+        "avgCollisionWaitPct": 0.1865001765313759,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.3198076863954442,
+      "throughputPenalty": 0.7665566075306735,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 12.565375809170249,
+          "avgQueue": 2.2227624370886234,
+          "maxQueue": 10,
+          "tasks": 251
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 12.430408449098987,
+          "avgQueue": 2.192000839418456,
+          "maxQueue": 7,
+          "tasks": 247
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 13.147215585737268,
+          "avgQueue": 2.3661628099298477,
+          "maxQueue": 9,
+          "tasks": 258
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 13.42010604052889,
+          "avgQueue": 2.3441779667860776,
+          "maxQueue": 9,
+          "tasks": 264
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 12.317029026805523,
+          "avgQueue": 2.193984301649162,
+          "maxQueue": 8,
+          "tasks": 247
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 12.60772710474357,
+          "avgQueue": 2.2372365007767203,
+          "maxQueue": 7,
+          "tasks": 252
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 12.138386335553212,
+          "avgQueue": 2.2127390290263707,
+          "maxQueue": 13,
+          "tasks": 242
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 11.980871496087342,
+          "avgQueue": 2.1258410171459197,
+          "maxQueue": 7,
+          "tasks": 239
+        }
+      ]
+    },
+    {
+      "botCount": 50,
+      "noCollision": {
+        "avgCycleTimeS": 205.80249999999995,
+        "throughputPerHour": 826.7068622551275,
+        "avgUtilization": 0.8953465262892936,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 284.9745,
+        "throughputPerHour": 613.0766634945775,
+        "avgUtilization": 0.9193472670095121,
+        "avgCollisionWaitPct": 0.20731748169106218,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.3846989225106596,
+      "throughputPenalty": 0.7415889373679564,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 17.092108626506494,
+          "avgQueue": 3.2015028375774586,
+          "maxQueue": 11,
+          "tasks": 289
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 14.670010764687532,
+          "avgQueue": 2.8909766693069043,
+          "maxQueue": 8,
+          "tasks": 246
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 15.916221352232046,
+          "avgQueue": 2.920332446984631,
+          "maxQueue": 10,
+          "tasks": 266
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 14.262598578077199,
+          "avgQueue": 2.583928811115869,
+          "maxQueue": 8,
+          "tasks": 234
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 13.923301013161923,
+          "avgQueue": 2.582866543918861,
+          "maxQueue": 8,
+          "tasks": 236
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 13.637138404352694,
+          "avgQueue": 2.5897853538976063,
+          "maxQueue": 10,
+          "tasks": 229
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 14.409715791512443,
+          "avgQueue": 2.669834449594491,
+          "maxQueue": 9,
+          "tasks": 245
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 15.298256704526418,
+          "avgQueue": 2.765740668381547,
+          "maxQueue": 9,
+          "tasks": 255
+        }
+      ]
+    },
+    {
+      "botCount": 75,
+      "noCollision": {
+        "avgCycleTimeS": 200.16649999999998,
+        "throughputPerHour": 1199.3219343507724,
+        "avgUtilization": 0.8588709921893519,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 304.40649999999994,
+        "throughputPerHour": 822.5025041950664,
+        "avgUtilization": 0.8955224873308436,
+        "avgCollisionWaitPct": 0.2413376592353768,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.520766461920451,
+      "throughputPenalty": 0.6858062715581957,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 20.225516940563885,
+          "avgQueue": 4.007901378886895,
+          "maxQueue": 10,
+          "tasks": 252
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 19.979182381705318,
+          "avgQueue": 4.246032867697642,
+          "maxQueue": 13,
+          "tasks": 251
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 18.436982527701208,
+          "avgQueue": 3.6614762822214018,
+          "maxQueue": 11,
+          "tasks": 230
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 19.75506621615825,
+          "avgQueue": 3.9517008841441266,
+          "maxQueue": 12,
+          "tasks": 249
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 19.05089443018415,
+          "avgQueue": 3.846777429706132,
+          "maxQueue": 11,
+          "tasks": 237
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 21.617504643403798,
+          "avgQueue": 4.51375628339453,
+          "maxQueue": 21,
+          "tasks": 268
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 22.06173304573756,
+          "avgQueue": 4.585081261589528,
+          "maxQueue": 13,
+          "tasks": 278
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 18.804162296919873,
+          "avgQueue": 3.8824425916866225,
+          "maxQueue": 15,
+          "tasks": 235
+        }
+      ]
+    },
+    {
+      "botCount": 100,
+      "noCollision": {
+        "avgCycleTimeS": 195.557,
+        "throughputPerHour": 1540.9370111086814,
+        "avgUtilization": 0.8169391776798939,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 316.50300000000004,
+        "throughputPerHour": 992.1891466556029,
+        "avgUtilization": 0.8509177445139067,
+        "avgCollisionWaitPct": 0.2610348469574271,
+        "totalTasks": 2000,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.6184692953972502,
+      "throughputPenalty": 0.6438868944693187,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 24.434978104915523,
+          "avgQueue": 5.145441870345751,
+          "maxQueue": 17,
+          "tasks": 253
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 23.443722612032918,
+          "avgQueue": 5.288400185708551,
+          "maxQueue": 17,
+          "tasks": 244
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 24.197550025076573,
+          "avgQueue": 5.372332629759457,
+          "maxQueue": 17,
+          "tasks": 250
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 22.78225428082111,
+          "avgQueue": 4.6270230413837385,
+          "maxQueue": 14,
+          "tasks": 237
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 25.026093323062042,
+          "avgQueue": 5.532495291893643,
+          "maxQueue": 16,
+          "tasks": 257
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 23.799088694114214,
+          "avgQueue": 5.478238614160132,
+          "maxQueue": 16,
+          "tasks": 248
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 22.877209980023654,
+          "avgQueue": 4.930050657298814,
+          "maxQueue": 13,
+          "tasks": 237
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 26.364770385210097,
+          "avgQueue": 5.716816352047244,
+          "maxQueue": 20,
+          "tasks": 274
+        }
+      ]
+    },
+    {
+      "botCount": 150,
+      "noCollision": {
+        "avgCycleTimeS": 187.06316572450518,
+        "throughputPerHour": 423.91823157894726,
+        "avgUtilization": 0.1536221187115665,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 1992,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 336.10075187969926,
+        "throughputPerHour": 3.5909999999999997,
+        "avgUtilization": 0.00885582666666667,
+        "avgCollisionWaitPct": 0.09185019844422632,
+        "totalTasks": 1995,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.7967233184468139,
+      "throughputPenalty": 0.008470973250253427,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 0.09240000000000001,
+          "avgQueue": 0.023285500000000004,
+          "maxQueue": 23,
+          "tasks": 264
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 0.0821,
+          "avgQueue": 0.0203575,
+          "maxQueue": 20,
+          "tasks": 236
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 0.08859999999999998,
+          "avgQueue": 0.0198505,
+          "maxQueue": 24,
+          "tasks": 251
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 0.08559999999999998,
+          "avgQueue": 0.019081499999999998,
+          "maxQueue": 18,
+          "tasks": 245
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 0.0935,
+          "avgQueue": 0.022302500000000003,
+          "maxQueue": 25,
+          "tasks": 266
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 0.08330000000000001,
+          "avgQueue": 0.021412499999999998,
+          "maxQueue": 24,
+          "tasks": 239
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 0.08320000000000001,
+          "avgQueue": 0.020281,
+          "maxQueue": 20,
+          "tasks": 240
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 0.08979999999999999,
+          "avgQueue": 0.020203500000000003,
+          "maxQueue": 31,
+          "tasks": 254
+        }
+      ]
+    },
+    {
+      "botCount": 200,
+      "noCollision": {
+        "avgCycleTimeS": 180.09658987350764,
+        "throughputPerHour": 2.6406,
+        "avgUtilization": 0.5334231774999992,
+        "avgCollisionWaitPct": 0,
+        "totalTasks": 1467,
+        "shiftsRun": 5
+      },
+      "cooperativeAStar": {
+        "avgCycleTimeS": 350.6914361115105,
+        "throughputPerHour": 2.3796,
+        "avgUtilization": 0.6785524399999999,
+        "avgCollisionWaitPct": 0.0007337872445070737,
+        "totalTasks": 1322,
+        "shiftsRun": 5
+      },
+      "cycleTimePenalty": 1.9472408464692283,
+      "throughputPenalty": 0.9011588275391956,
+      "stationCongestion": [
+        {
+          "id": "op-4-0",
+          "utilPct": 0.0603,
+          "avgQueue": 0.015265500000000001,
+          "maxQueue": 32,
+          "tasks": 163
+        },
+        {
+          "id": "op-8-0",
+          "utilPct": 0.059899999999999995,
+          "avgQueue": 0.016064500000000002,
+          "maxQueue": 29,
+          "tasks": 159
+        },
+        {
+          "id": "op-12-0",
+          "utilPct": 0.06620000000000001,
+          "avgQueue": 0.015667999999999998,
+          "maxQueue": 31,
+          "tasks": 176
+        },
+        {
+          "id": "op-16-0",
+          "utilPct": 0.0615,
+          "avgQueue": 0.013219999999999999,
+          "maxQueue": 28,
+          "tasks": 164
+        },
+        {
+          "id": "op-4-46",
+          "utilPct": 0.05059999999999999,
+          "avgQueue": 0.012184500000000001,
+          "maxQueue": 28,
+          "tasks": 132
+        },
+        {
+          "id": "op-8-46",
+          "utilPct": 0.0693,
+          "avgQueue": 0.0188275,
+          "maxQueue": 34,
+          "tasks": 183
+        },
+        {
+          "id": "op-12-46",
+          "utilPct": 0.0621,
+          "avgQueue": 0.014316,
+          "maxQueue": 28,
+          "tasks": 167
+        },
+        {
+          "id": "op-16-46",
+          "utilPct": 0.06670000000000001,
+          "avgQueue": 0.0144785,
+          "maxQueue": 34,
+          "tasks": 178
+        }
+      ]
+    }
+  ]
+}

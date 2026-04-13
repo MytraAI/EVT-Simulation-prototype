@@ -147,14 +147,10 @@ function spaceTimeAStar(
         entry = entry.parent;
       }
       path.reverse();
-      // Deduplicate consecutive same nodes (waits)
-      const dedupedPath: string[] = [];
-      for (const nodeId of path) {
-        if (dedupedPath.length === 0 || dedupedPath[dedupedPath.length - 1] !== nodeId) {
-          dedupedPath.push(nodeId);
-        }
-      }
-      return { path: dedupedPath, ticks: current.node.tick - startTick };
+      // Keep wait nodes (consecutive same-node entries) in the path.
+      // The engine uses these to hold the bot in place for the planned
+      // number of ticks, preserving the conflict-free guarantee.
+      return { path, ticks: current.node.tick - startTick };
     }
 
     // Don't search too far into the future
@@ -216,6 +212,10 @@ function spaceTimeAStar(
   return null; // no path found
 }
 
+// Module-level heuristic cache — Dijkstra from a target node
+// doesn't change between ticks, so we compute once and reuse.
+const _heuristicCache = new Map<string, Map<string, number>>();
+
 /**
  * Plan paths for all bots using Cooperative A*.
  *
@@ -242,15 +242,31 @@ export function cooperativePathPlan(
     return a.id - b.id;
   });
 
-  // Pre-compute heuristics for each unique target
-  const heuristicCache = new Map<string, Map<string, number>>();
+  // Reserve the current-tick position of EVERY bot so that no plan
+  // starts by moving through another bot's position (prevents head-on
+  // deadlocks with runtime collision enforcement).
+  for (const bot of sortedBots) {
+    reservations.set(resKey(bot.currentNodeId, currentTick), bot.id);
+  }
+
+  // Additionally, reserve the full planning horizon for stationary bots
+  // (IDLE, PICKING, PLACING) — they have no target and would otherwise
+  // be invisible to the reservation table.
+  const planningHorizon = 200; // match maxSearchTicks default
+  for (const bot of sortedBots) {
+    const target = getTarget(bot);
+    if (target) continue; // will be planned in the main loop below
+    for (let t = currentTick + 1; t <= currentTick + planningHorizon; t++) {
+      reservations.set(resKey(bot.currentNodeId, t), bot.id);
+    }
+  }
 
   for (const bot of sortedBots) {
     const target = getTarget(bot);
     if (!target) continue;
 
-    // Get or compute heuristic (reverse Dijkstra from target)
-    let heuristic = heuristicCache.get(target);
+    // Get or compute heuristic (reverse Dijkstra from target — cached across ticks)
+    let heuristic = _heuristicCache.get(target);
     if (!heuristic) {
       const costs = singleSourceCosts(target);
       // Convert Dijkstra cost (seconds) to approximate ticks
@@ -258,7 +274,7 @@ export function cooperativePathPlan(
       for (const [nodeId, cost] of costs) {
         heuristic.set(nodeId, Math.ceil(cost));
       }
-      heuristicCache.set(target, heuristic);
+      _heuristicCache.set(target, heuristic);
     }
 
     const blocked = getIsCarrying(bot) ? palletOcclusions : null;

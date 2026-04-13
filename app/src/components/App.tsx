@@ -4,9 +4,10 @@ import { ConfigPanel } from "./ConfigPanel";
 import { Viewport } from "./Viewport";
 import { Controls } from "./Controls";
 import { MetricsPanel } from "./MetricsPanel";
+import { SweepResultsPanel } from "./SweepResultsPanel";
 import type { GraphData } from "../graph/types";
 
-const DEFAULT_MAP = "/EVT_3_31_21.json";
+const DEFAULT_MAP = "/grainger-pilot-04102026-graph.json";
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -33,6 +34,15 @@ export function App() {
   const graph = useStore((s) => s.graph);
   const setGraphData = useStore((s) => s.setGraphData);
   const metricsPanelHeight = useStore((s) => s.metricsPanelHeight);
+  const sweepResults = useStore((s) => s.sweepResults);
+  const [bottomTab, setBottomTab] = useState<"metrics" | "sweep">("metrics");
+
+  // Auto-switch to sweep tab when results arrive
+  useEffect(() => {
+    if (sweepResults && sweepResults.length > 0) {
+      setBottomTab("sweep");
+    }
+  }, [sweepResults]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -88,7 +98,39 @@ export function App() {
 
         {graph && (
           <ErrorBoundary>
-            <MetricsPanel height={metricsPanelHeight} />
+            {sweepResults ? (
+              <div>
+                <div className="flex border-t border-gray-700 bg-gray-800">
+                  <button
+                    className={`px-4 py-1.5 text-xs font-semibold transition-colors ${
+                      bottomTab === "metrics"
+                        ? "text-cyan-400 border-b-2 border-cyan-400"
+                        : "text-gray-500 hover:text-gray-300"
+                    }`}
+                    onClick={() => setBottomTab("metrics")}
+                  >
+                    Live Sim
+                  </button>
+                  <button
+                    className={`px-4 py-1.5 text-xs font-semibold transition-colors ${
+                      bottomTab === "sweep"
+                        ? "text-emerald-400 border-b-2 border-emerald-400"
+                        : "text-gray-500 hover:text-gray-300"
+                    }`}
+                    onClick={() => setBottomTab("sweep")}
+                  >
+                    DES Sweep
+                  </button>
+                </div>
+                {bottomTab === "metrics" ? (
+                  <MetricsPanel height={metricsPanelHeight} />
+                ) : (
+                  <SweepResultsPanel height={metricsPanelHeight} />
+                )}
+              </div>
+            ) : (
+              <MetricsPanel height={metricsPanelHeight} />
+            )}
           </ErrorBoundary>
         )}
       </div>

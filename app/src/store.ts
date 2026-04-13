@@ -4,6 +4,10 @@ import type { WarehouseGraph } from "./graph/loader";
 import { loadGraph } from "./graph/loader";
 import type { SimConfig, SimState } from "./simulation/types";
 import { DEFAULT_CONFIG } from "./simulation/types";
+import type { DESConfig, DESSweepPoint, PickTimeDistribution } from "./simulation/des-types";
+import { DEFAULT_DES_CONFIG } from "./simulation/des-types";
+import type { CalibrationConfig, CongestionCurve, CalibrationSample } from "./simulation/congestion-calibration";
+import { DEFAULT_CALIBRATION_CONFIG } from "./simulation/congestion-calibration";
 
 export type CameraMode = "3d" | "isometric" | "2d";
 export type SimSpeed = 1 | 2 | 5 | 10 | 0; // 0 = max
@@ -42,6 +46,30 @@ type Store = {
 
   selectedNodeId: string | null;
   setSelectedNodeId: (id: string | null) => void;
+
+  // DES sweep
+  desConfig: DESConfig;
+  updateDESConfig: (partial: Partial<DESConfig>) => void;
+  sweepResults: DESSweepPoint[] | null;
+  setSweepResults: (results: DESSweepPoint[] | null) => void;
+  sweepRunning: boolean;
+  setSweepRunning: (running: boolean) => void;
+  sweepProgress: { completed: number; total: number } | null;
+  setSweepProgress: (p: { completed: number; total: number } | null) => void;
+  pickTimeDist: PickTimeDistribution | null;
+  setPickTimeDist: (dist: PickTimeDistribution | null) => void;
+
+  // Congestion calibration
+  calibConfig: CalibrationConfig;
+  updateCalibConfig: (partial: Partial<CalibrationConfig>) => void;
+  congestionCurve: CongestionCurve | null;
+  setCongestionCurve: (curve: CongestionCurve | null) => void;
+  calibRunning: boolean;
+  setCalibRunning: (running: boolean) => void;
+  calibProgress: { completed: number; total: number } | null;
+  setCalibProgress: (p: { completed: number; total: number } | null) => void;
+  calibSamples: CalibrationSample[] | null;
+  setCalibSamples: (samples: CalibrationSample[] | null) => void;
 };
 
 // Max frames to keep in history (~10 min at 1x = 1200 frames)
@@ -88,4 +116,30 @@ export const useStore = create<Store>((set) => ({
 
   selectedNodeId: null,
   setSelectedNodeId: (id) => set({ selectedNodeId: id }),
+
+  // DES sweep
+  desConfig: DEFAULT_DES_CONFIG,
+  updateDESConfig: (partial) =>
+    set((s) => ({ desConfig: { ...s.desConfig, ...partial } })),
+  sweepResults: null,
+  setSweepResults: (sweepResults) => set({ sweepResults }),
+  sweepRunning: false,
+  setSweepRunning: (sweepRunning) => set({ sweepRunning }),
+  sweepProgress: null,
+  setSweepProgress: (sweepProgress) => set({ sweepProgress }),
+  pickTimeDist: null,
+  setPickTimeDist: (pickTimeDist) => set({ pickTimeDist }),
+
+  // Congestion calibration
+  calibConfig: DEFAULT_CALIBRATION_CONFIG,
+  updateCalibConfig: (partial) =>
+    set((s) => ({ calibConfig: { ...s.calibConfig, ...partial } })),
+  congestionCurve: null,
+  setCongestionCurve: (congestionCurve) => set({ congestionCurve }),
+  calibRunning: false,
+  setCalibRunning: (calibRunning) => set({ calibRunning }),
+  calibProgress: null,
+  setCalibProgress: (calibProgress) => set({ calibProgress }),
+  calibSamples: null,
+  setCalibSamples: (calibSamples) => set({ calibSamples }),
 }));

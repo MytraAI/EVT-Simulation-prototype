@@ -12,30 +12,17 @@ import type {
 import { findPath, findPathBlocked } from "./wasm-bridge";
 import { buildLevelMaxMass, selectInductionPosition } from "./position-selector";
 import { cooperativePathPlan } from "./mapf";
-
-/**
- * Compute nodes that are blocked for pallet-carrying bots.
- * When a pallet occupies a position, its bot_occupancy_occlusions
- * list nodes that a carrying bot cannot traverse.
- */
-function computeBlockedNodesForCarrying(
-  graph: WarehouseGraph,
-  pallets: Map<string, unknown>,
-): string[] {
-  const blocked = new Set<string>();
-  for (const [posId] of pallets) {
-    const node = graph.nodeMap.get(posId);
-    if (!node) continue;
-    const occlusions = node.computed?.bot_occupancy_occlusions ?? [];
-    for (const occId of occlusions) {
-      blocked.add(occId);
-    }
-  }
-  return Array.from(blocked);
-}
+import {
+  computeBlockedNodesForCarrying,
+  computePathDistanceM,
+  generateSkuCatalog,
+  pickSkuForOrder,
+} from "./shared-utils";
 
 /**
  * Find a path, using blocked pathfinding if the bot is/will be carrying a pallet.
+ * Falls back to unblocked pathfinding if all occlusion-aware paths are blocked,
+ * so tasks are never permanently stuck.
  */
 function findPathForBot(
   fromId: string,
@@ -46,116 +33,17 @@ function findPathForBot(
 ): { totalCost: number; path: string[] } | null {
   if (isCarrying) {
     const blocked = computeBlockedNodesForCarrying(graph, pallets);
-    return findPathBlocked(fromId, toId, blocked);
+    const result = findPathBlocked(fromId, toId, blocked);
+    if (result) return result;
+    // Occlusion-aware path blocked — fall back to unblocked routing
+    // so the task can still complete (better than infinite stall).
+    return findPath(fromId, toId);
   }
   return findPath(fromId, toId);
 }
 
-const SKU_PALETTE = [
-  "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
-  "#911eb4", "#42d4f4", "#f032e6", "#bfef45", "#fabed4",
-  "#469990", "#dcbeff", "#9A6324", "#fffac8", "#800000",
-  "#aaffc3", "#808000", "#ffd8b1", "#000075", "#a9a9a9",
-  "#e6beff", "#1ce6ff", "#ff34ff", "#ff4a46", "#008941",
-  "#006fa6", "#a30059", "#ffdbe5", "#7a4900", "#0000a6",
-];
-
-/**
- * Height classes based on level restrictions from the EVT map:
- *   L1: max 1.83m → tall pallets (1.2-1.8m)
- *   L2/L3: max 1.22m → medium pallets (0.6-1.2m)
- *   L4: max 0.46m → short pallets (0.2-0.45m)
- *
- * Rule: taller = heavier. Height class determines both height and weight range.
- */
-type HeightClassDef = {
-  heightClass: import("./types").HeightClass;
-  heightRange: [number, number]; // meters
-  weightRange: [number, number]; // kg
-};
-
-const HEIGHT_CLASSES: HeightClassDef[] = [
-  { heightClass: "tall",   heightRange: [1.2, 1.8],  weightRange: [700, 1200] },
-  { heightClass: "medium", heightRange: [0.6, 1.2],  weightRange: [350, 700] },
-  { heightClass: "short",  heightRange: [0.2, 0.45], weightRange: [100, 350] },
-];
-
-function generateSkuCatalog(count: number): SkuInfo[] {
-  const skus: SkuInfo[] = [];
-  const third = Math.max(1, Math.floor(count / 3));
-
-  for (let i = 0; i < count; i++) {
-    // Velocity: first third = high, second = medium, last = low
-    let velocity: import("./types").Velocity;
-    if (i < third) velocity = "high";
-    else if (i < third * 2) velocity = "medium";
-    else velocity = "low";
-
-    // Height class assignment:
-    // - High velocity: mix of tall (60%) and medium (40%) — heavy, frequent
-    // - Medium velocity: mix of all classes
-    // - Low velocity: 50% tall/heavy, 50% short/light
-    let hcDef: HeightClassDef;
-    if (velocity === "high") {
-      hcDef = Math.random() < 0.6 ? HEIGHT_CLASSES[0] : HEIGHT_CLASSES[1];
-    } else if (velocity === "medium") {
-      const r = Math.random();
-      hcDef = r < 0.33 ? HEIGHT_CLASSES[0] : r < 0.66 ? HEIGHT_CLASSES[1] : HEIGHT_CLASSES[2];
-    } else {
-      hcDef = Math.random() < 0.5 ? HEIGHT_CLASSES[0] : HEIGHT_CLASSES[2];
-    }
-
-    const [minH, maxH] = hcDef.heightRange;
-    const [minW, maxW] = hcDef.weightRange;
-
-    skus.push({
-      sku: `SKU-${String(i + 1).padStart(3, "0")}`,
-      color: SKU_PALETTE[i % SKU_PALETTE.length],
-      weightKg: minW + Math.random() * (maxW - minW),
-      heightM: minH + Math.random() * (maxH - minH),
-      velocity,
-      heightClass: hcDef.heightClass,
-    });
-  }
-  return skus;
-}
-
-/**
- * Pick a SKU for a new order.
- * Priority by velocity class: 5:3:1 ratio (high:medium:low).
- * Within each class, sorted by velocity priority then random.
- */
-function pickSkuForOrder(catalog: SkuInfo[]): SkuInfo {
-  const high = catalog.filter((s) => s.velocity === "high");
-  const medium = catalog.filter((s) => s.velocity === "medium");
-  const low = catalog.filter((s) => s.velocity === "low");
-
-  // 5:3:1 weighted sampling
-  const r = Math.random() * 9;
-  let pool: SkuInfo[];
-  if (r < 5 && high.length > 0) pool = high;
-  else if (r < 8 && medium.length > 0) pool = medium;
-  else if (low.length > 0) pool = low;
-  else pool = catalog;
-
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-/**
- * Compute actual distance in meters for a path (sum of edge distance_m).
- */
-function computePathDistanceM(path: string[], graph: WarehouseGraph): number {
-  let dist = 0;
-  for (let i = 0; i < path.length - 1; i++) {
-    const edge = graph.data.edges.find(
-      (e) =>
-        (e.a === path[i] && e.b === path[i + 1]) ||
-        (e.b === path[i] && e.a === path[i + 1]),
-    );
-    if (edge) dist += edge.distance_m;
-  }
-  return dist;
-}
+// SKU catalog, path distance, blocked nodes, and SKU order selection
+// are now imported from ./shared-utils
 
 /**
  * How many ticks (seconds) does it take to traverse one edge?
@@ -242,14 +130,16 @@ function shouldWaitForCollision(
 ): boolean {
   if (config.algorithm === "no-collision") return false;
 
-  // CA* paths are already deconflicted — no runtime collision check needed
-  if (config.algorithm === "cooperative-astar") return false;
-
   const occupyingBotId = botPositions.get(nextNodeId);
   if (occupyingBotId === undefined || occupyingBotId === bot.id) return false;
 
-  // Node is occupied by another bot
+  // Strict: always blocked (requires external solver for deadlock)
   if (config.algorithm === "strict") return true;
+
+  // CA* plans minimise conflicts, but runtime enforcement catches edge
+  // cases.  Allow phase-through after 50 ticks to escape deadlocks
+  // (in real operations a fleet controller resolves these).
+  if (config.algorithm === "cooperative-astar") return bot.collisionWaitTicks < 50;
 
   // soft-collision: wait up to N ticks, then phase through
   return bot.collisionWaitTicks < config.softCollisionWaitTicks;
@@ -615,6 +505,10 @@ export function stepSimulation(
               botId: b.id, stationId: unassigned.stationNodeId,
               positionId: unassigned.positionNodeId, status: "assigned",
             });
+          } else {
+            // Can't reach pickup — unassign so another bot can try
+            unassigned.assignedBotId = null;
+            b.task = null;
           }
         }
         break;
@@ -665,6 +559,9 @@ export function stepSimulation(
             b.state = "TRAVELING_TO_DROPOFF";
             b.task.travelDistanceM += computePathDistanceM(pathResult.path, graph);
           } else {
+            // Can't reach dropoff — unassign so another bot can try
+            const droppedTask = tasks.find(t => t.id === b.task!.id);
+            if (droppedTask) droppedTask.assignedBotId = null;
             b.state = "IDLE";
             b.task = null;
           }
