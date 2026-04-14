@@ -876,6 +876,7 @@ func runShift(raw *RawGraph, costs CostParams, item WorkItem, palletCount int) W
 
 func main() {
 	debugMode := flag.Bool("debug", false, "Run diagnostic trace instead of calibration")
+	zoneMode := flag.Bool("zone", false, "Run station zone congestion analysis (south dispatch)")
 	mapPath := flag.String("map", "app/public/grainger-pilot-04102026-graph.json", "Graph JSON path")
 	botsStr := flag.String("bots", "2,5,10,15,20,30,40,50,75,100,150,200", "Comma-separated bot counts")
 	shifts := flag.Int("shifts", 5, "Shifts per (botCount, algo) pair")
@@ -887,6 +888,10 @@ func main() {
 
 	if *debugMode {
 		runDiagnostic(*mapPath)
+		return
+	}
+	if *zoneMode {
+		runZoneAnalysis(*mapPath, *pallets, *shifts)
 		return
 	}
 
