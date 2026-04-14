@@ -1,11 +1,15 @@
-// Standalone station-zone simulation.
+// Standalone station-zone simulation for south dispatch.
 //
-// Extracts a subgraph slice around the south dispatch stations (y < cutoff)
-// and stress-tests station throughput by spawning bots at the entry aisle,
-// routing them one-way through the station, and out the exit aisle.
+// Models one-way bot flow per station:
+//   Entry lane (north→south):  storage → entry aisle → station
+//   Exit lane  (south→north):  station → transfer corridor → exit aisle → storage
+//
+// Rows 1-2 (y ≤ 3.81m) are treated as travel-only buffer (no storage).
+// Cross-aisle transfers between entry and exit lanes go through pallet
+// position nodes at these rows.
 //
 // Usage:
-//   ./calibrate-bin --zone --pallets 200 --shifts 3
+//   ./calibrate-bin --zone --pallets 200 --shifts 5
 
 package main
 
@@ -21,52 +25,42 @@ import (
 // ─── Zone definitions ───
 
 type StationZone struct {
-	Name       string // e.g. "S1"
-	StationOp  string // e.g. "op-4-0"
-	GatewayXY  string // e.g. "xy-3-0"
-	GatewayRow int    // e.g. 3
-	EntryRow   int    // aisle row bots enter from
-	ExitRow    int    // aisle row bots leave via
+	Name      string
+	StationOp string
+	GatewayXY string
+	EntryRow  int // gateway row — bots travel north→south
+	ExitRow   int // adjacent row — bots travel south→north
 }
 
 var southZones = []StationZone{
-	{"S1", "op-4-0", "xy-3-0", 3, 1, 5},
-	{"S2", "op-8-0", "xy-7-0", 7, 5, 9},
-	{"S3", "op-12-0", "xy-11-0", 11, 9, 13},
-	{"S4", "op-16-0", "xy-15-0", 15, 13, 17},
+	{"S1", "op-4-0", "xy-3-0", 3, 5},
+	{"S2", "op-8-0", "xy-7-0", 7, 9},
+	{"S3", "op-12-0", "xy-11-0", 11, 13},
+	{"S4", "op-16-0", "xy-15-0", 15, 17},
 }
 
 // ─── Subgraph extraction ───
 
-type ZoneGraph struct {
-	Nodes     []RawNode
-	Edges     []RawEdge
-	NodeSet   map[string]bool
-	NodeIndex map[string]*RawNode
-}
-
-// extractSouthZone pulls out ground-floor nodes with y < maxY.
-func extractSouthZone(raw *RawGraph, maxY float64) *ZoneGraph {
+func extractSouthZone(raw *RawGraph, maxY float64) (*RawGraph, map[string]*RawNode) {
 	nodeSet := make(map[string]bool)
 	nodeIndex := make(map[string]*RawNode)
 	var nodes []RawNode
 
 	for i := range raw.Nodes {
 		n := &raw.Nodes[i]
-		// Ground floor only (level 1 or z=0)
 		if n.Position.ZM > 0.1 {
-			continue
+			continue // ground floor only
 		}
-		// Within south zone Y cutoff
 		if n.Position.YM > maxY {
 			continue
 		}
 		nodes = append(nodes, *n)
 		nodeSet[n.ID] = true
-		nodeIndex[n.ID] = &nodes[len(nodes)-1]
+	}
+	for i := range nodes {
+		nodeIndex[nodes[i].ID] = &nodes[i]
 	}
 
-	// Only keep edges where both endpoints are in the zone
 	var edges []RawEdge
 	for _, e := range raw.Edges {
 		if nodeSet[e.A] && nodeSet[e.B] {
@@ -74,41 +68,38 @@ func extractSouthZone(raw *RawGraph, maxY float64) *ZoneGraph {
 		}
 	}
 
-	return &ZoneGraph{
-		Nodes:     nodes,
-		Edges:     edges,
-		NodeSet:   nodeSet,
-		NodeIndex: nodeIndex,
-	}
+	return &RawGraph{Nodes: nodes, Edges: edges}, nodeIndex
 }
 
-// ─── Zone bot simulation ───
+// findDeepestAisleCell returns the aisle cell with highest Y in a given row
+// within the zone. This is the entry/exit boundary point.
+func findDeepestAisleCell(zoneRaw *RawGraph, row int) string {
+	prefix := fmt.Sprintf("a-1-%d-", row)
+	best := ""
+	bestY := -1.0
+	for _, n := range zoneRaw.Nodes {
+		if strings.HasPrefix(n.ID, prefix) {
+			if n.Position.YM > bestY {
+				bestY = n.Position.YM
+				best = n.ID
+			}
+		}
+	}
+	return best
+}
+
+// ─── Zone bot ───
 
 type ZoneBot struct {
-	ID               int
-	State            string // "entering", "at_station", "exiting", "done"
-	CurrentNodeID    string
-	Path             []string
-	PathIndex        int
-	StepsRemaining   int
-	EdgeWaitTicks    int
-	Zone             *StationZone
-	EnteredAt        int // tick entered zone
-	DoneAt           int // tick exited zone
-	WaitTicks        int // total ticks spent waiting (collision)
-}
-
-type ZoneSimState struct {
-	Step           int
-	Bots           []*ZoneBot
-	BotPositions   map[string]int // nodeID -> botID
-	CompletedBots  int
-	TotalCycleTime int
-
-	zg        *ZoneGraph
-	dg        *DirectedGraph
-	cfg       SimConfig
-	rng       *rand.Rand
+	ID             int
+	State          string // "waiting", "to_station", "at_station", "to_exit", "done"
+	CurrentNodeID  string
+	Path           []string
+	PathIndex      int
+	StepsRemaining int
+	EdgeWaitTicks  int
+	EnteredAt      int
+	WaitTicks      int
 }
 
 type ZoneResult struct {
@@ -121,62 +112,19 @@ type ZoneResult struct {
 	Steps           int
 }
 
-// findZoneEntryNodes returns the aisle cells at the boundary of the zone
-// for a given aisle row (the deepest Y position in the zone).
-func findZoneEntryNodes(zg *ZoneGraph, row int, maxCol int) []string {
-	prefix := fmt.Sprintf("a-1-%d-", row)
-	var nodes []string
-	for id := range zg.NodeSet {
-		if strings.HasPrefix(id, prefix) {
-			parts := strings.Split(id, "-")
-			if len(parts) >= 4 {
-				col := 0
-				fmt.Sscanf(parts[3], "%d", &col)
-				if col >= maxCol-1 && col <= maxCol {
-					nodes = append(nodes, id)
-				}
-			}
-		}
-	}
-	sort.Strings(nodes)
-	return nodes
-}
+// ─── Simulation ───
 
-// findZoneExitNodes returns aisle cells at zone boundary for exit row.
-func findZoneExitNodes(zg *ZoneGraph, row int, maxCol int) []string {
-	return findZoneEntryNodes(zg, row, maxCol)
-}
-
-// runZoneSim runs a standalone zone simulation for one station zone.
 func runZoneSim(
 	raw *RawGraph,
 	zone StationZone,
-	botsPerStation int,
+	numBots int,
 	palletCount int,
 	cfg SimConfig,
 	seed int64,
 ) ZoneResult {
-	// Extract south zone subgraph (up to ~10m Y)
 	maxY := 10.0
-	zg := extractSouthZone(raw, maxY)
+	zoneRaw, nodeIndex := extractSouthZone(raw, maxY)
 
-	// Find the deepest column in the zone for this station's rows
-	maxCol := 0
-	gwPrefix := fmt.Sprintf("a-1-%d-", zone.GatewayRow)
-	for id := range zg.NodeSet {
-		if strings.HasPrefix(id, gwPrefix) {
-			parts := strings.Split(id, "-")
-			if len(parts) >= 4 {
-				col := 0
-				fmt.Sscanf(parts[3], "%d", &col)
-				if col > maxCol {
-					maxCol = col
-				}
-			}
-		}
-	}
-
-	// Build directed graph for the zone
 	costs := CostParams{
 		XYCostPerM:    1.0 / cfg.BotSpeedMps,
 		ZUpCostPerM:   1.0 / cfg.ZUpSpeedMps,
@@ -184,51 +132,31 @@ func runZoneSim(
 		XYTurnCost:    cfg.XYTurnTimeS,
 		XYZTurnCost:   cfg.XYZTransitionTimeS,
 	}
-	zoneRaw := &RawGraph{Nodes: zg.Nodes, Edges: zg.Edges}
 	dg := buildDirectedGraphFromRaw(zoneRaw, costs)
 
-	// Find entry/exit spawn points
-	entryNodes := findZoneEntryNodes(zg, zone.EntryRow, maxCol)
-	exitNodes := findZoneExitNodes(zg, zone.ExitRow, maxCol)
+	entryCell := findDeepestAisleCell(zoneRaw, zone.EntryRow)
+	exitCell := findDeepestAisleCell(zoneRaw, zone.ExitRow)
 
-	if len(entryNodes) == 0 {
-		// Fallback: use first aisle cell in entry row
-		prefix := fmt.Sprintf("a-1-%d-", zone.EntryRow)
-		for id := range zg.NodeSet {
-			if strings.HasPrefix(id, prefix) {
-				entryNodes = append(entryNodes, id)
-			}
-		}
-		sort.Strings(entryNodes)
-		if len(entryNodes) > 2 {
-			entryNodes = entryNodes[len(entryNodes)-2:]
-		}
+	if entryCell == "" || exitCell == "" {
+		return ZoneResult{Zone: zone.Name, BotsPerStation: numBots}
 	}
-	if len(exitNodes) == 0 {
-		prefix := fmt.Sprintf("a-1-%d-", zone.ExitRow)
-		for id := range zg.NodeSet {
-			if strings.HasPrefix(id, prefix) {
-				exitNodes = append(exitNodes, id)
-			}
-		}
-		sort.Strings(exitNodes)
-		if len(exitNodes) > 2 {
-			exitNodes = exitNodes[len(exitNodes)-2:]
-		}
+
+	// Verify paths exist
+	toStation := Dijkstra(dg, entryCell, zone.StationOp)
+	fromStation := Dijkstra(dg, zone.StationOp, exitCell)
+	if toStation == nil || fromStation == nil {
+		fmt.Printf("  WARNING: %s no path entry(%s)->stn or stn->exit(%s)\n",
+			zone.Name, entryCell, exitCell)
+		return ZoneResult{Zone: zone.Name, BotsPerStation: numBots}
 	}
 
 	rng := rand.New(rand.NewSource(seed))
+	_ = rng
 	botPositions := make(map[string]int)
 
-	// Spawn queue model: maintain a pool of N bot "slots".
-	// A bot only enters the zone when the entry cell is free.
-	bots := make([]*ZoneBot, botsPerStation)
+	bots := make([]*ZoneBot, numBots)
 	for i := range bots {
-		bots[i] = &ZoneBot{
-			ID:    i,
-			State: "waiting", // waiting to enter
-			Zone:  &zone,
-		}
+		bots[i] = &ZoneBot{ID: i, State: "waiting"}
 	}
 
 	completedBots := 0
@@ -241,36 +169,31 @@ func runZoneSim(
 	for step < maxSteps && completedBots < palletCount {
 		step++
 
-		// Try to inject waiting bots at free entry cells
+		// Inject one waiting bot per tick if entry is free
 		for _, b := range bots {
 			if b.State != "waiting" || tasksRemaining <= 0 {
 				continue
 			}
-			entry := entryNodes[rng.Intn(len(entryNodes))]
-			if _, occupied := botPositions[entry]; occupied {
-				continue // entry blocked, try next tick
+			if _, occ := botPositions[entryCell]; occ {
+				break // entry occupied
 			}
-			// Spawn into zone
 			tasksRemaining--
-			b.CurrentNodeID = entry
-			b.State = "entering"
+			b.CurrentNodeID = entryCell
+			b.State = "to_station"
 			b.EnteredAt = step
 			b.WaitTicks = 0
 			b.EdgeWaitTicks = 0
-			botPositions[entry] = b.ID
-			result := Dijkstra(dg, entry, zone.StationOp)
+			botPositions[entryCell] = b.ID
+
+			result := Dijkstra(dg, entryCell, zone.StationOp)
 			if result != nil {
 				b.Path = result.Path
 				b.PathIndex = 0
-			} else {
-				b.State = "waiting"
-				tasksRemaining++
-				delete(botPositions, entry)
 			}
-			break // only inject one per tick to avoid entry collision
+			break // one injection per tick
 		}
 
-		// Update active bots
+		// Update bots
 		for _, b := range bots {
 			if b.State == "waiting" || b.State == "done" {
 				continue
@@ -281,23 +204,21 @@ func runZoneSim(
 			}
 
 			switch b.State {
-			case "entering":
+			case "to_station":
 				if b.PathIndex >= len(b.Path)-1 {
 					b.State = "at_station"
 					b.StepsRemaining = cfg.StationPickTimeS
 					continue
 				}
 				nextNode := b.Path[b.PathIndex+1]
-				// Enforce collision only in aisle cells (not station/gateway
-				// nodes where bots pass through briefly in real operations)
-				isAisle := strings.HasPrefix(nextNode, "a-")
-				if isAisle {
+				// Collision in aisle cells only; station/gateway/pallet-transfer = pass-through
+				if strings.HasPrefix(nextNode, "a-") {
 					if occ, ok := botPositions[nextNode]; ok && occ != b.ID {
 						b.WaitTicks++
 						continue
 					}
 				}
-				ticks := edgeTravelTicks(zoneRaw, zg.NodeIndex, b.CurrentNodeID, nextNode, cfg)
+				ticks := edgeTravelTicks(zoneRaw, nodeIndex, b.CurrentNodeID, nextNode, cfg)
 				delete(botPositions, b.CurrentNodeID)
 				b.PathIndex++
 				b.CurrentNodeID = b.Path[b.PathIndex]
@@ -309,14 +230,13 @@ func runZoneSim(
 			case "at_station":
 				b.StepsRemaining--
 				if b.StepsRemaining <= 0 {
-					exitNode := exitNodes[rng.Intn(len(exitNodes))]
-					result := Dijkstra(dg, b.CurrentNodeID, exitNode)
+					result := Dijkstra(dg, b.CurrentNodeID, exitCell)
 					if result != nil {
 						b.Path = result.Path
 						b.PathIndex = 0
-						b.State = "exiting"
+						b.State = "to_exit"
 					} else {
-						b.DoneAt = step
+						// Can't find exit, complete anyway
 						completedBots++
 						totalCycleTime += step - b.EnteredAt
 						totalWaitTicks += b.WaitTicks
@@ -325,25 +245,23 @@ func runZoneSim(
 					}
 				}
 
-			case "exiting":
-				if b.PathIndex >= len(b.Path) - 1 {
-					b.DoneAt = step
+			case "to_exit":
+				if b.PathIndex >= len(b.Path)-1 {
 					completedBots++
 					totalCycleTime += step - b.EnteredAt
 					totalWaitTicks += b.WaitTicks
 					delete(botPositions, b.CurrentNodeID)
-					b.State = "waiting" // ready for next task
+					b.State = "waiting"
 					continue
 				}
 				nextNode := b.Path[b.PathIndex+1]
-				isAisle := strings.HasPrefix(nextNode, "a-")
-				if isAisle {
+				if strings.HasPrefix(nextNode, "a-") {
 					if occ, ok := botPositions[nextNode]; ok && occ != b.ID {
 						b.WaitTicks++
 						continue
 					}
 				}
-				ticks := edgeTravelTicks(zoneRaw, zg.NodeIndex, b.CurrentNodeID, nextNode, cfg)
+				ticks := edgeTravelTicks(zoneRaw, nodeIndex, b.CurrentNodeID, nextNode, cfg)
 				delete(botPositions, b.CurrentNodeID)
 				b.PathIndex++
 				b.CurrentNodeID = b.Path[b.PathIndex]
@@ -364,13 +282,13 @@ func runZoneSim(
 		throughput = float64(completedBots) / (float64(step) / 3600.0)
 	}
 	avgWait := 0.0
-	if completedBots > 0 {
+	if totalCycleTime > 0 {
 		avgWait = float64(totalWaitTicks) / float64(totalCycleTime) * 100
 	}
 
 	return ZoneResult{
 		Zone:            zone.Name,
-		BotsPerStation:  botsPerStation,
+		BotsPerStation:  numBots,
 		CompletedTasks:  completedBots,
 		AvgCycleTimeS:   avgCycle,
 		ThroughputPerHr: throughput,
@@ -379,7 +297,7 @@ func runZoneSim(
 	}
 }
 
-// ─── Zone analysis runner ───
+// ─── Runner ───
 
 func runZoneAnalysis(mapPath string, pallets int, shifts int) {
 	raw, err := loadRawGraph(mapPath)
@@ -388,114 +306,130 @@ func runZoneAnalysis(mapPath string, pallets int, shifts int) {
 		return
 	}
 
-	fmt.Println("=== Station Zone Congestion Analysis (South Dispatch) ===")
+	fmt.Println("=== Station Zone Analysis (South Dispatch) ===")
 	fmt.Printf("Map:     %s\n", mapPath)
-	fmt.Printf("Pallets: %d per run\n", pallets)
-	fmt.Printf("Shifts:  %d per (zone, botCount)\n", shifts)
+	fmt.Printf("Pallets: %d per run | Shifts: %d\n", pallets, shifts)
 	fmt.Println()
 
-	// Show zone graph info
-	zg := extractSouthZone(raw, 10.0)
-	fmt.Printf("Zone slice: %d nodes, %d edges (y < 10m, ground floor)\n", len(zg.Nodes), len(zg.Edges))
-
-	// Count nodes per type
+	// Zone info
+	zoneRaw, _ := extractSouthZone(raw, 10.0)
 	kinds := map[string]int{}
-	for _, n := range zg.Nodes {
+	for _, n := range zoneRaw.Nodes {
 		kinds[n.Kind]++
 	}
-	fmt.Printf("  Aisle cells: %d, Pallet positions: %d, Station nodes: %d\n",
+	fmt.Printf("Zone slice (y < 10m, ground floor): %d nodes, %d edges\n",
+		len(zoneRaw.Nodes), len(zoneRaw.Edges))
+	fmt.Printf("  Aisles: %d | Pallet positions: %d | Station nodes: %d\n",
 		kinds["AISLE_CELL"], kinds["PALLET_POSITION"],
 		kinds["STATION_OP"]+kinds["STATION_XY"]+kinds["STATION_PEZ"])
 	fmt.Println()
 
+	// Show zone paths
+	costs := CostParams{
+		XYCostPerM: 1.0 / defaultSimConfig.BotSpeedMps,
+		ZUpCostPerM: 1.0 / defaultSimConfig.ZUpSpeedMps,
+		ZDownCostPerM: 1.0 / defaultSimConfig.ZDownSpeedMps,
+		XYTurnCost: defaultSimConfig.XYTurnTimeS,
+		XYZTurnCost: defaultSimConfig.XYZTransitionTimeS,
+	}
+	dg := buildDirectedGraphFromRaw(zoneRaw, costs)
+	fmt.Println("Station zone paths:")
+	for _, z := range southZones {
+		entry := findDeepestAisleCell(zoneRaw, z.EntryRow)
+		exit := findDeepestAisleCell(zoneRaw, z.ExitRow)
+		toStn := Dijkstra(dg, entry, z.StationOp)
+		toExit := Dijkstra(dg, z.StationOp, exit)
+		entryHops, exitHops := 0, 0
+		if toStn != nil { entryHops = len(toStn.Path) }
+		if toExit != nil { exitHops = len(toExit.Path) }
+		fmt.Printf("  %s: entry %s (%d hops) -> %s -> exit %s (%d hops)\n",
+			z.Name, entry, entryHops, z.StationOp, exit, exitHops)
+	}
+	fmt.Println()
+
 	botCounts := []int{1, 2, 3, 4, 5, 6, 8, 10, 12, 15}
 	cfg := defaultSimConfig
-
 	startTime := time.Now()
 
-	type zoneRow struct {
-		zone string
-		bots int
+	type row struct {
+		zone    string
+		bots    int
 		results []ZoneResult
 	}
-	var allRows []zoneRow
+	var allRows []row
 
 	for _, zone := range southZones {
 		for _, bc := range botCounts {
 			var results []ZoneResult
 			for s := 0; s < shifts; s++ {
-				seed := int64(zone.GatewayRow*10000 + bc*100 + s)
+				seed := int64(zone.EntryRow*10000 + bc*100 + s)
 				r := runZoneSim(raw, zone, bc, pallets, cfg, seed)
 				results = append(results, r)
 			}
-			allRows = append(allRows, zoneRow{zone.Name, bc, results})
+			allRows = append(allRows, row{zone.Name, bc, results})
 		}
 	}
 
-	elapsed := time.Since(startTime).Seconds()
-	fmt.Printf("Completed in %.1fs\n\n", elapsed)
+	fmt.Printf("Completed in %.1fs\n\n", time.Since(startTime).Seconds())
 
-	// Print per-zone results
+	// Per-zone table
 	for _, zone := range southZones {
-		fmt.Printf("Station %s (%s) | entry=row %d, exit=row %d\n",
+		fmt.Printf("%s (%s) | entry=row %d (N->S) | exit=row %d (S->N)\n",
 			zone.Name, zone.StationOp, zone.EntryRow, zone.ExitRow)
-		fmt.Println("  Bots | Throughput/hr | Avg Cycle(s) | Wait%  | Completed")
-		fmt.Println("  -----+--------------+--------------+--------+----------")
-		for _, row := range allRows {
-			if row.zone != zone.Name {
+		fmt.Println("  Bots  Thr/hr   Cycle(s)  Wait%%  Done")
+		fmt.Println("  ----  ------   --------  -----  ----")
+		for _, r := range allRows {
+			if r.zone != zone.Name {
 				continue
 			}
-			// Average across shifts
-			n := float64(len(row.results))
-			var thrSum, cycSum, waitSum float64
-			totalComp := 0
-			for _, r := range row.results {
-				thrSum += r.ThroughputPerHr
-				cycSum += r.AvgCycleTimeS
-				waitSum += r.AvgWaitPct
-				totalComp += r.CompletedTasks
+			n := float64(len(r.results))
+			var thr, cyc, wait float64
+			done := 0
+			for _, res := range r.results {
+				thr += res.ThroughputPerHr
+				cyc += res.AvgCycleTimeS
+				wait += res.AvgWaitPct
+				done += res.CompletedTasks
 			}
-			fmt.Printf("  %4d | %12.1f | %12.1f | %5.1f%% | %d/%d\n",
-				row.bots, thrSum/n, cycSum/n, waitSum/n,
-				totalComp/len(row.results), pallets)
+			fmt.Printf("  %4d  %6.1f   %8.1f  %4.1f%%  %d/%d\n",
+				r.bots, thr/n, cyc/n, wait/n, done/len(r.results), pallets)
 		}
 		fmt.Println()
 	}
 
-	// Summary: find sweet spot per zone
-	fmt.Println("Sweet Spot Summary")
-	fmt.Println("  Zone | Best Bots | Peak Thr/hr | Cycle(s) | Wait%")
-	fmt.Println("  -----+-----------+-------------+----------+------")
+	// Sweet spot
+	fmt.Println("Sweet Spot per Station")
+	fmt.Println("  Zone  Bots  Peak Thr/hr  Cycle(s)  Wait%%")
+	fmt.Println("  ----  ----  -----------  --------  -----")
 	for _, zone := range southZones {
-		bestThr := 0.0
-		bestBots := 0
-		bestCyc := 0.0
-		bestWait := 0.0
-		for _, row := range allRows {
-			if row.zone != zone.Name {
+		bestThr, bestBots := 0.0, 0
+		var bestCyc, bestWait float64
+		for _, r := range allRows {
+			if r.zone != zone.Name {
 				continue
 			}
-			n := float64(len(row.results))
-			var thrSum float64
-			for _, r := range row.results {
-				thrSum += r.ThroughputPerHr
+			n := float64(len(r.results))
+			var thr float64
+			for _, res := range r.results {
+				thr += res.ThroughputPerHr
 			}
-			avgThr := thrSum / n
-			if avgThr > bestThr {
-				bestThr = avgThr
-				bestBots = row.bots
-				var cycSum, waitSum float64
-				for _, r := range row.results {
-					cycSum += r.AvgCycleTimeS
-					waitSum += r.AvgWaitPct
+			avg := thr / n
+			if avg > bestThr {
+				bestThr = avg
+				bestBots = r.bots
+				var c, w float64
+				for _, res := range r.results {
+					c += res.AvgCycleTimeS
+					w += res.AvgWaitPct
 				}
-				bestCyc = cycSum / n
-				bestWait = waitSum / n
+				bestCyc = c / n
+				bestWait = w / n
 			}
 		}
-		fmt.Printf("  %s   | %9d | %11.1f | %8.1f | %4.1f%%\n",
+		fmt.Printf("  %s    %4d  %11.1f  %8.1f  %4.1f%%\n",
 			zone.Name, bestBots, bestThr, bestCyc, bestWait)
 	}
 
-	_ = math.Max // keep import
+	_ = math.Max
+	_ = sort.Strings
 }
