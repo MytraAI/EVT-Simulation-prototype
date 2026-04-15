@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EVT Station Sim — Grainger Pilot</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#0f1117; color:#e0e0e0; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+header { background:#161b22; padding:8px 16px; display:flex; align-items:center; gap:16px; border-bottom:1px solid #30363d; }
+header h1 { font-size:15px; color:#58a6ff; font-weight:600; }
+header .status { font-size:12px; color:#8b949e; }
+.main { display:flex; flex:1; overflow:hidden; }
+.sidebar { width:330px; overflow-y:auto; padding:8px; background:#161b22; border-right:1px solid #30363d; flex-shrink:0; font-size:12px; }
+.canvas-wrap { flex:1; position:relative; overflow:hidden; background:#0d1117; }
+canvas { display:block; }
+.section { margin-bottom:6px; border:1px solid #21262d; border-radius:6px; overflow:hidden; }
+.section-title { font-size:11px; font-weight:600; color:#58a6ff; cursor:pointer; padding:6px 10px; background:#161b22; user-select:none; display:flex; justify-content:space-between; text-transform:uppercase; letter-spacing:0.5px; }
+.section-title:hover { background:#1c2128; }
+.section-body { padding:6px 10px; background:#0d1117; }
+.section-body.collapsed { display:none; }
+.row { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.row label { flex:0 0 110px; color:#8b949e; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.row input[type=range] { flex:1; min-width:60px; accent-color:#58a6ff; height:14px; }
+.row input[type=number] { width:55px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:3px; padding:2px 4px; font-size:11px; }
+.row .val { flex:0 0 42px; text-align:right; color:#58a6ff; font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
+.row select { flex:1; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:3px 6px; font-size:11px; }
+.btn-row { display:flex; gap:4px; margin-bottom:6px; }
+.btn { padding:5px 14px; font-size:11px; font-weight:600; border:1px solid #30363d; border-radius:6px; background:#21262d; color:#c9d1d9; cursor:pointer; }
+.btn:hover { background:#30363d; border-color:#58a6ff; }
+.btn.primary { background:#238636; border-color:#2ea043; color:#fff; }
+.btn.primary:hover { background:#2ea043; }
+.btn.danger { background:#da3633; border-color:#f85149; color:#fff; }
+.metrics-grid { display:grid; grid-template-columns:1fr 1fr; gap:2px 12px; }
+.metric { display:flex; justify-content:space-between; padding:2px 0; }
+.metric .lbl { color:#8b949e; font-size:11px; }
+.metric .val { color:#58a6ff; font-weight:600; font-size:11px; }
+.legend { display:flex; flex-wrap:wrap; gap:8px; padding:6px 0; }
+.legend-item { display:flex; align-items:center; gap:4px; font-size:10px; color:#8b949e; }
+.legend-dot { width:10px; height:10px; border-radius:2px; }
+.drop-zone { border:2px dashed #30363d; border-radius:6px; padding:12px; text-align:center; font-size:11px; color:#484f58; margin-bottom:6px; cursor:pointer; transition:all 0.15s; }
+.drop-zone:hover, .drop-zone.over { border-color:#58a6ff; color:#58a6ff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>EVT Station Sim</h1>
+  <span class="status" id="statusText">Click below to load graph</span>
+</header>
+<div class="main">
+  <div class="sidebar">
+    <div class="drop-zone" id="dropZone">Load Graph Slice (click or drop JSON)</div>
+
+    <!-- CP-SAT Solver -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">CP-SAT Solver <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>Slice</label>
+          <select id="cfgSlice">
+            <option value="south" selected>South Zone (4 stations)</option>
+            <option value="casepick">Casepick Slice (1 station)</option>
+          </select>
+        </div>
+        <div class="row"><label>Service time (s)</label><input type="range" id="cfgSvcTime" min="5" max="120" value="46"><span class="val" id="valSvcTime">46</span></div>
+        <div class="row"><label>Buffer (s)</label><input type="range" id="cfgBuffer" min="0" max="10" value="2"><span class="val" id="valBuffer">2</span></div>
+        <div class="row"><label>Bots/wave</label><input type="range" id="cfgSolverBots" min="1" max="10" value="4"><span class="val" id="valSolverBots">4</span></div>
+        <div class="row"><label>Waves</label><input type="range" id="cfgSolverWaves" min="1" max="5" value="2"><span class="val" id="valSolverWaves">2</span></div>
+        <div class="btn-row">
+          <button class="btn primary" id="btnSolve" style="flex:1">Solve Schedule</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fleet Sweep -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Fleet Sweep <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>Max bots/wave</label><input type="range" id="cfgSweepMaxBots" min="2" max="10" value="6"><span class="val" id="valSweepMaxBots">6</span></div>
+        <div class="row"><label>Max waves</label><input type="range" id="cfgSweepMaxWaves" min="1" max="5" value="3"><span class="val" id="valSweepMaxWaves">3</span></div>
+        <div class="btn-row">
+          <button class="btn primary" id="btnSweep" style="flex:1">Run Fleet Sweep</button>
+        </div>
+        <div id="sweepResults" style="margin-top:8px;font-size:10px;max-height:240px;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- Per-subtype operator HANDLE times (pre-drop) -->
+    <div class="section" id="caseSubtypeSection">
+      <div class="section-title" onclick="toggleSection(this)">Case (PIPO) Handle <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>Case Conveyable</label><input type="range" id="cfgSvcCaseConv" min="5" max="120" value="30"><span class="val" id="valSvcCaseConv">30</span></div>
+        <div class="row"><label>Case Non-Conv</label><input type="range" id="cfgSvcCaseNcv" min="5" max="120" value="55"><span class="val" id="valSvcCaseNcv">55</span></div>
+        <div style="color:#8b949e;font-size:10px;margin-top:4px">Both drop to conveyor after handle</div>
+      </div>
+    </div>
+
+    <!-- Per-subtype operator HANDLE times (pre-drop) for PICO -->
+    <div class="section" id="casepickSubtypeSection">
+      <div class="section-title" onclick="toggleSection(this)">Casepick (PICO) Handle <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>CP Conveyable</label><input type="range" id="cfgSvcCpConv" min="5" max="120" value="40"><span class="val" id="valSvcCpConv">40</span></div>
+        <div class="row"><label>CP Non-Conv</label><input type="range" id="cfgSvcCpNcv" min="5" max="120" value="55"><span class="val" id="valSvcCpNcv">55</span></div>
+        <div style="color:#8b949e;font-size:10px;margin-top:4px">Conv → conveyor | NCV → bin or repal</div>
+      </div>
+    </div>
+
+    <!-- Drop-off phase times -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Drop-off Times <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>Conveyor drop</label><input type="range" id="cfgDropConveyor" min="0" max="30" value="5"><span class="val" id="valDropConveyor">5</span></div>
+        <div class="row"><label>Bin drop (NCV)</label><input type="range" id="cfgDropBin" min="0" max="30" value="8"><span class="val" id="valDropBin">8</span></div>
+        <div class="row"><label>Repal drop (NCV)</label><input type="range" id="cfgDropRepal" min="0" max="60" value="15"><span class="val" id="valDropRepal">15</span></div>
+        <div style="color:#8b949e;font-size:10px;margin-top:4px">Added to handle time per subtype</div>
+      </div>
+    </div>
+
+    <div class="drop-zone" id="schedDropZone" style="border-color:#238636;color:#484f58">Drop schedule.json for CP-SAT wave replay</div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="btnPlay">Play</button>
+      <button class="btn" id="btnStep">Step</button>
+      <button class="btn danger" id="btnReset">Reset</button>
+      <select id="speed" style="flex:1;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:3px;font-size:11px;">
+        <option value="1">1x</option><option value="2">2x</option><option value="5" selected>5x</option>
+        <option value="10">10x</option><option value="50">50x</option><option value="200">200x</option>
+      </select>
+    </div>
+
+    <!-- Mode -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Mode & Shift <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>Mode</label><select id="cfgMode"><option value="pallet">Pallet (PIPO)</option><option value="casepick">Casepick (PICO)</option><option value="mixed" selected>Mixed (south OB)</option></select></div>
+        <div class="row"><label>Bot count</label><input type="range" id="cfgBots" min="1" max="50" value="5"><span class="val" id="valBots">5</span></div>
+        <div class="row"><label>Pallets/shift</label><input type="range" id="cfgPallets" min="5" max="500" value="50"><span class="val" id="valPallets">50</span></div>
+        <div class="row"><label>Initial fill %</label><input type="range" id="cfgFill" min="0" max="100" value="0" step="5"><span class="val" id="valFill">0</span></div>
+        <div class="row"><label>Level filter</label><select id="cfgLevel"><option value="0">All levels</option><option value="1" selected>Level 1 (ground)</option><option value="2">Level 2</option><option value="3">Level 3</option><option value="4">Level 4</option></select></div>
+      </div>
+    </div>
+
+    <!-- Movement -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Movement <span>&#9654;</span></div>
+      <div class="section-body collapsed">
+        <div class="row"><label>Bot speed (m/s)</label><input type="range" id="cfgBotSpeed" min="0.1" max="5" value="1.0" step="0.1"><span class="val" id="valBotSpeed">1.0</span></div>
+        <div class="row"><label>Z-up speed (m/s)</label><input type="range" id="cfgZUp" min="0.05" max="1" value="0.1" step="0.05"><span class="val" id="valZUp">0.1</span></div>
+        <div class="row"><label>Z-down (m/s)</label><input type="range" id="cfgZDown" min="0.1" max="2" value="0.5" step="0.1"><span class="val" id="valZDown">0.5</span></div>
+        <div class="row"><label>XY turn (s)</label><input type="range" id="cfgTurn" min="0" max="10" value="2" step="0.5"><span class="val" id="valTurn">2</span></div>
+        <div class="row"><label>XY-Z trans (s)</label><input type="range" id="cfgTransition" min="0" max="10" value="3" step="0.5"><span class="val" id="valTransition">3</span></div>
+      </div>
+    </div>
+
+    <!-- Station timing -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Station Timing (flat) <span>&#9654;</span></div>
+      <div class="section-body collapsed">
+        <div class="row"><label>Stn pick (s)</label><input type="range" id="cfgStnPick" min="1" max="30" value="8"><span class="val" id="valStnPick">8</span></div>
+        <div class="row"><label>Stn drop (s)</label><input type="range" id="cfgStnDrop" min="1" max="30" value="6"><span class="val" id="valStnDrop">6</span></div>
+        <div class="row"><label>Pos pick (s)</label><input type="range" id="cfgPosPick" min="1" max="30" value="4"><span class="val" id="valPosPick">4</span></div>
+        <div class="row"><label>Pos drop (s)</label><input type="range" id="cfgPosDrop" min="1" max="30" value="5"><span class="val" id="valPosDrop">5</span></div>
+      </div>
+    </div>
+
+    <!-- Operator -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Operator <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>Ops/station</label><input type="range" id="cfgOps" min="0" max="5" value="1"><span class="val" id="valOps">1</span></div>
+        <div class="row"><label>Identify (s)</label><input type="range" id="cfgOpIdent" min="1" max="15" value="5"><span class="val" id="valOpIdent">5</span></div>
+        <div class="row"><label>Handle (s)</label><input type="range" id="cfgOpHandle" min="1" max="15" value="3"><span class="val" id="valOpHandle">3</span></div>
+        <div class="row"><label>Confirm (s)</label><input type="range" id="cfgOpConfirm" min="1" max="15" value="3"><span class="val" id="valOpConfirm">3</span></div>
+      </div>
+    </div>
+
+    <!-- Conveyable -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Conveyable / Non-Conv <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>Conveyable %</label><input type="range" id="cfgConvPct" min="0" max="100" value="60" step="5"><span class="val" id="valConvPct">60</span></div>
+        <div class="row"><label>Handle conv (s)</label><input type="range" id="cfgHandleConv" min="1" max="15" value="3"><span class="val" id="valHandleConv">3</span></div>
+        <div class="row"><label>Handle NCV (s)</label><input type="range" id="cfgHandleNcv" min="1" max="30" value="8"><span class="val" id="valHandleNcv">8</span></div>
+        <div class="row"><label>Pick/case NCV (s)</label><input type="range" id="cfgPickNcv" min="1" max="15" value="5"><span class="val" id="valPickNcv">5</span></div>
+        <div class="row"><label>Bin/repal (s)</label><input type="range" id="cfgBinRepal" min="0" max="30" value="10"><span class="val" id="valBinRepal">10</span></div>
+      </div>
+    </div>
+
+    <!-- Casepick -->
+    <div class="section" id="casepickSection" style="display:none">
+      <div class="section-title" onclick="toggleSection(this)">Casepick (PICO) <span>&#9660;</span></div>
+      <div class="section-body">
+        <div class="row"><label>Cases/pallet</label><input type="range" id="cfgCasesPallet" min="1" max="100" value="24"><span class="val" id="valCasesPallet">24</span></div>
+        <div class="row"><label>Cases/pick</label><input type="range" id="cfgCasesPick" min="1" max="50" value="4"><span class="val" id="valCasesPick">4</span></div>
+        <div class="row"><label>Pick time/case</label><input type="range" id="cfgPickTime" min="1" max="10" value="3"><span class="val" id="valPickTime">3</span></div>
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="section">
+      <div class="section-title">Live Metrics</div>
+      <div class="section-body">
+        <div class="metrics-grid">
+          <div class="metric"><span class="lbl">Time</span><span class="val" id="mTime">0s</span></div>
+          <div class="metric"><span class="lbl">Tasks</span><span class="val" id="mTasks">0/0</span></div>
+          <div class="metric"><span class="lbl">Throughput</span><span class="val" id="mThroughput">0/hr</span></div>
+          <div class="metric"><span class="lbl">Bot util</span><span class="val" id="mBotUtil">0%</span></div>
+          <div class="metric"><span class="lbl">Op util</span><span class="val" id="mOpUtil">0%</span></div>
+          <div class="metric"><span class="lbl">Queued</span><span class="val" id="mQueue">0</span></div>
+          <div class="metric" id="mCasesRow" style="display:none"><span class="lbl">Cases</span><span class="val" id="mCases">0</span></div>
+          <div class="metric" id="mWaveRow" style="display:none"><span class="lbl">Wave</span><span class="val" id="mWave">0</span></div>
+          <div class="metric" id="mPPHRow" style="display:none"><span class="lbl">Proj PPH</span><span class="val" id="mProjPPH">0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div>Station OP</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#059669"></div>Station XY</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div>Station PEZ</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#eab308"></div>Conv Pallet</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>NCV Pallet</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div>Aisle</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Z-Column</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Bot</div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// GLOBALS
+// ============================================================
+let graphData=null, graph=null, sim=null, playing=false;
+const $ = id => document.getElementById(id);
+
+function readConfig() {
+  return {
+    mode:$('cfgMode').value, botCount:+$('cfgBots').value, shiftPallets:+$('cfgPallets').value,
+    initialFillPct:+$('cfgFill').value/100, levelFilter:+$('cfgLevel').value,
+    botSpeedMps:+$('cfgBotSpeed').value, zUpSpeedMps:+$('cfgZUp').value, zDownSpeedMps:+$('cfgZDown').value,
+    xyTurnTimeS:+$('cfgTurn').value, xyzTransitionTimeS:+$('cfgTransition').value,
+    stationPickTimeS:+$('cfgStnPick').value, stationDropTimeS:+$('cfgStnDrop').value,
+    positionPickTimeS:+$('cfgPosPick').value, positionDropTimeS:+$('cfgPosDrop').value,
+    opsPerStation:+$('cfgOps').value, opIdentifyTimeS:+$('cfgOpIdent').value,
+    opHandleTimeS:+$('cfgOpHandle').value, opConfirmTimeS:+$('cfgOpConfirm').value,
+    casesPerPallet:+$('cfgCasesPallet').value, casesPerPick:+$('cfgCasesPick').value,
+    pickTimePerCaseS:+$('cfgPickTime').value,
+    conveyablePct:+$('cfgConvPct').value, opHandleConvS:+$('cfgHandleConv').value,
+    opHandleNcvS:+$('cfgHandleNcv').value, pickTimeNcvS:+$('cfgPickNcv').value,
+    binRepalTimeS:+$('cfgBinRepal').value,
+  };
+}
+
+// ============================================================
+// GRAPH LOADER
+// ============================================================
+function loadGraph(raw) {
+  graphData = raw;
+  const nodeMap = {};
+  const nodes = raw.nodes.map(n => {
+    const nd = { id:n.id, kind:n.kind, level:n.level||1,
+      x:n.position.x_m, y:n.position.y_m, z:n.position.z_m,
+      gx:n.x??0, gy:n.y??0,
+      sx:n.size_x_m||1.3, sy:n.size_y_m||1.3 };
+    nodeMap[n.id] = nd;
+    return nd;
+  });
+  const edges = raw.edges.map(e => ({ id:e.id, a:e.a, b:e.b, axis:e.axis, distanceM:e.distance_m }));
+  const adj = {};
+  for (const n of nodes) adj[n.id] = [];
+  for (const e of edges) {
+    if (adj[e.a]) adj[e.a].push({ to:e.b, edge:e });
+    if (adj[e.b]) adj[e.b].push({ to:e.a, edge:e });
+  }
+  const stationOps = nodes.filter(n=>n.kind==='STATION_OP').map(n=>n.id);
+  const palletPositions = nodes.filter(n=>n.kind==='PALLET_POSITION').map(n=>n.id);
+  const aisles = nodes.filter(n=>n.kind==='AISLE_CELL').map(n=>n.id);
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for (const n of nodes) { minX=Math.min(minX,n.x); maxX=Math.max(maxX,n.x); minY=Math.min(minY,n.y); maxY=Math.max(maxY,n.y); }
+  graph = { nodes, edges, nodeMap, adj, stationOps, palletPositions, aisles, bounds:{minX,maxX,minY,maxY} };
+  return graph;
+}
+
+// ============================================================
+// DIJKSTRA
+// ============================================================
+function dijkstra(g, cfg, from, to) {
+  if (from===to) return [from];
+  const dist={}, prev={}, visited=new Set();
+  dist[from]=0;
+  const pq=[[0,from]];
+  while (pq.length) {
+    pq.sort((a,b)=>a[0]-b[0]);
+    const [d,u]=pq.shift();
+    if (visited.has(u)) continue;
+    visited.add(u);
+    if (u===to) break;
+    for (const {to:v, edge} of (g.adj[u]||[])) {
+      if (visited.has(v)) continue;
+      let cost;
+      if (edge.axis==='z') {
+        const nf=g.nodeMap[u],nt=g.nodeMap[v];
+        cost=(nt&&nf&&nt.z>nf.z)?edge.distanceM/cfg.zUpSpeedMps:edge.distanceM/cfg.zDownSpeedMps;
+      } else { cost=edge.distanceM/cfg.botSpeedMps; }
+      if (cost<0.01) cost=0.01;
+      const nd=d+cost;
+      if (nd<(dist[v]??Infinity)) { dist[v]=nd; prev[v]=u; pq.push([nd,v]); }
+    }
+  }
+  if (!(to in prev)&&from!==to) return null;
+  const path=[]; let cur=to;
+  while(cur){path.unshift(cur);cur=prev[cur];}
+  return path.length>0&&path[0]===from?path:null;
+}
+function edgeTravelTicks(g,cfg,from,to) {
+  for (const {to:v,edge} of (g.adj[from]||[])) {
+    if (v===to) {
+      let t; if (edge.axis==='z'){const nf=g.nodeMap[from],nt=g.nodeMap[to];t=(nt&&nf&&nt.z>nf.z)?edge.distanceM/cfg.zUpSpeedMps:edge.distanceM/cfg.zDownSpeedMps;}
+      else t=edge.distanceM/cfg.botSpeedMps;
+      return Math.max(1,Math.ceil(t));
+    }
+  } return 1;
+}
+
+// ============================================================
+// SIMULATION ENGINE
+// ============================================================
+const S={IDLE:0,TRAVEL_PU:1,EDGE_WAIT:2,WAIT_OP:3,PICKING:4,TRAVEL_DO:5,EDGE_WAIT_DO:6,PLACING:7};
+const OP={IDLE:0,IDENT:1,HANDLE:2,CONFIRM:3};
+
+function createSim(g,cfg) {
+  const starts=g.aisles.length?g.aisles:g.stationOps;
+  const bots=[];
+  for(let i=0;i<cfg.botCount;i++) bots.push({id:i,state:S.IDLE,nodeId:starts[i%starts.length],path:[],pathIndex:0,task:null,stepsRemaining:0,edgeWaitTicks:0,waitingPhase:'',idleSteps:0,busySteps:0,tasksCompleted:0});
+  const pallets={};
+  const shuffled=[...g.palletPositions].sort(()=>Math.random()-0.5);
+  const ic=(cfg.mode==='casepick'||cfg.mode==='mixed')?cfg.casesPerPallet:1;
+  const fill=Math.floor(g.palletPositions.length*cfg.initialFillPct);
+  for(let i=0;i<fill;i++) pallets[shuffled[i]]={casesRemaining:ic, conveyable: Math.random()*100 < cfg.conveyablePct};
+  const operators={},opQueues={},opHandleTimes={};
+  let oid=0;
+  for(const stn of g.stationOps){operators[stn]=[];opQueues[stn]=[];
+    for(let i=0;i<cfg.opsPerStation;i++) operators[stn].push({id:oid++,state:OP.IDLE,botId:-1,stepsRemaining:0,idleTicks:0,identifyTicks:0,handleTicks:0,confirmTicks:0,tasksCompleted:0});}
+  return {step:0,bots,pallets,operators,opQueues,opHandleTimes,tasks:[],completedTasks:[],taskCounter:0,shiftTasksGenerated:0,shiftDone:false,totalCasesPicked:0};
+}
+
+function enqBot(s,cfg,stn,bid,ht){s.opHandleTimes[bid]=ht;for(const op of(s.operators[stn]||[])){if(op.state===OP.IDLE){op.state=OP.IDENT;op.botId=bid;op.stepsRemaining=cfg.opIdentifyTimeS;return true;}}s.opQueues[stn].push(bid);return false;}
+function getHandleTime(task,cfg){
+  if(cfg.mode==='casepick'&&task.type==='retrieval'&&task.casesThisTrip>0){
+    if(task.conveyable) return task.casesThisTrip*cfg.pickTimePerCaseS;
+    return task.casesThisTrip*cfg.pickTimeNcvS + cfg.binRepalTimeS;
+  }
+  return task.conveyable ? cfg.opHandleConvS : cfg.opHandleNcvS;
+}
+
+// South station config for mixed mode
+const CASEPICK_STATIONS = new Set(['op-16-46']);
+const SOUTH_STATIONS = ['op-4-46','op-8-46','op-12-46','op-16-46'];
+
+function pickStation(g, cfg, isCasepick) {
+  if (cfg.mode === 'mixed') {
+    // Filter south stations only
+    const southOps = g.stationOps.filter(s => SOUTH_STATIONS.includes(s));
+    const cands = southOps.filter(s => isCasepick ? CASEPICK_STATIONS.has(s) : !CASEPICK_STATIONS.has(s));
+    if (cands.length) return cands[Math.floor(Math.random() * cands.length)];
+    if (southOps.length) return southOps[Math.floor(Math.random() * southOps.length)];
+  }
+  return g.stationOps[Math.floor(Math.random() * g.stationOps.length)];
+}
+
+function genTask(s,g,cfg){
+  if(!g.stationOps.length)return null;
+  const iT=new Set(),rT=new Set();
+  for(const t of s.tasks){if(t.type==='induction')iT.add(t.posId);else rT.add(t.posId);}
+  const cap=(cfg.mode==='casepick'||cfg.mode==='mixed')?cfg.shiftPallets:Math.floor(cfg.shiftPallets/2);
+  if(s.shiftTasksGenerated<cap){
+    const stn=pickStation(g, cfg, false);
+    const sh=[...g.palletPositions].sort(()=>Math.random()-0.5);
+    for(const pid of sh){if(!s.pallets[pid]&&!iT.has(pid)){s.taskCounter++;return{id:s.taskCounter,type:'induction',stnId:stn,posId:pid,botId:-1,createdAt:s.step,casesThisTrip:0,isPartial:false,conveyable:Math.random()*100<cfg.conveyablePct};}}
+    return null;
+  }
+  const cands=[];
+  for(const[pid,info]of Object.entries(s.pallets)){if(!rT.has(pid)&&info&&info.casesRemaining>0)cands.push(pid);}
+  if(cands.length){
+    const pid=cands[Math.floor(Math.random()*cands.length)];
+    s.taskCounter++;
+    const pI=s.pallets[pid];
+    // Mixed mode: non-conveyable → casepick station, conveyable → pallet station
+    const isCasepickRetrieval = (cfg.mode==='casepick') || (cfg.mode==='mixed' && !pI.conveyable);
+    const stn=pickStation(g, cfg, isCasepickRetrieval);
+    const t={id:s.taskCounter,type:'retrieval',stnId:stn,posId:pid,botId:-1,createdAt:s.step,casesThisTrip:0,isPartial:false,conveyable:pI.conveyable};
+    if(isCasepickRetrieval){const c=Math.min(cfg.casesPerPick,pI.casesRemaining);t.casesThisTrip=c;t.isPartial=(pI.casesRemaining-c)>0;}
+    return t;
+  }
+  return null;
+}
+
+function finishTask(s,b){b.task=null;b.state=S.IDLE;b.waitingPhase='';}
+
+function handleArrival(s,b,cfg,g){
+  const isPU=(b.state===S.TRAVEL_PU||b.state===S.EDGE_WAIT);
+  if(isPU){
+    if(cfg.opsPerStation>0&&b.task.type==='induction'){b.state=S.WAIT_OP;b.waitingPhase='pickup';enqBot(s,cfg,b.task.stnId,b.id,getHandleTime(b.task,cfg));}
+    else{b.state=S.PICKING;b.stepsRemaining=b.task.type==='induction'?cfg.stationPickTimeS:cfg.positionPickTimeS;}
+  } else {
+    if(b.waitingPhase==='return'){b.state=S.PLACING;b.stepsRemaining=cfg.positionDropTimeS;}
+    else if(cfg.opsPerStation>0&&b.task.type==='retrieval'){b.state=S.WAIT_OP;b.waitingPhase='dropoff';enqBot(s,cfg,b.task.stnId,b.id,getHandleTime(b.task,cfg));}
+    else{b.state=S.PLACING;if(b.task.type==='induction')b.stepsRemaining=cfg.positionDropTimeS;else if(cfg.mode==='casepick'&&b.task.casesThisTrip>0)b.stepsRemaining=b.task.casesThisTrip*cfg.pickTimePerCaseS;else b.stepsRemaining=cfg.stationDropTimeS;}
+  }
+}
+
+function stepSim(s,g,cfg){
+  if(s.shiftDone)return;
+  s.step++;
+  // Gen tasks
+  let idle=s.bots.filter(b=>b.state===S.IDLE).length;
+  let unass=s.tasks.filter(t=>t.botId===-1).length;
+  for(let i=0;i<idle-unass+3;i++){
+    if(cfg.mode!=='casepick'&&s.shiftTasksGenerated>=cfg.shiftPallets)break;
+    const t=genTask(s,g,cfg);if(!t)break;s.tasks.push(t);
+    if(t.type==='induction')s.shiftTasksGenerated++;else if(cfg.mode!=='casepick')s.shiftTasksGenerated++;
+  }
+  // Shift done
+  if(cfg.mode==='casepick'||cfg.mode==='mixed'){if(s.shiftTasksGenerated>=cfg.shiftPallets&&s.tasks.length===0){let done=true;for(const i of Object.values(s.pallets))if(i&&i.casesRemaining>0){done=false;break;}if(done){s.shiftDone=true;return;}}}
+  else{if(s.shiftTasksGenerated>=cfg.shiftPallets&&s.tasks.length===0){s.shiftDone=true;return;}}
+  if(s.tasks.length===0&&s.completedTasks.length>0){const t=genTask(s,g,cfg);if(t)s.tasks.push(t);else{s.shiftDone=true;return;}}
+
+  // Bots
+  for(const b of s.bots){
+    if(b.state===S.EDGE_WAIT||b.state===S.EDGE_WAIT_DO){b.busySteps++;b.edgeWaitTicks--;if(b.edgeWaitTicks<=0){if(b.pathIndex>=b.path.length-1)handleArrival(s,b,cfg,g);else b.state=(b.state===S.EDGE_WAIT)?S.TRAVEL_PU:S.TRAVEL_DO;}continue;}
+    switch(b.state){
+    case S.IDLE:b.idleSteps++;for(const t of s.tasks){if(t.botId===-1){t.botId=b.id;b.task=t;const tgt=t.type==='induction'?t.stnId:t.posId;const p=dijkstra(g,cfg,b.nodeId,tgt);if(p){b.path=p;b.pathIndex=0;b.state=S.TRAVEL_PU;}else{t.botId=-1;b.task=null;}break;}}break;
+    case S.TRAVEL_PU:case S.TRAVEL_DO:
+      b.busySteps++;if(b.pathIndex<b.path.length-1){const nn=b.path[b.pathIndex+1];const tk=edgeTravelTicks(g,cfg,b.nodeId,nn);b.pathIndex++;b.nodeId=b.path[b.pathIndex];if(tk>1){b.edgeWaitTicks=tk-1;b.state=(b.state===S.TRAVEL_PU)?S.EDGE_WAIT:S.EDGE_WAIT_DO;continue;}if(b.pathIndex>=b.path.length-1)handleArrival(s,b,cfg,g);}break;
+    case S.WAIT_OP:b.busySteps++;break;
+    case S.PICKING:b.busySteps++;b.stepsRemaining--;if(b.stepsRemaining<=0&&b.task){const tgt=b.task.type==='induction'?b.task.posId:b.task.stnId;const p=dijkstra(g,cfg,b.nodeId,tgt);if(p){b.path=p;b.pathIndex=0;b.state=S.TRAVEL_DO;}else{b.state=S.IDLE;b.task=null;}}break;
+    case S.PLACING:b.busySteps++;b.stepsRemaining--;if(b.stepsRemaining<=0&&b.task){
+      if(b.waitingPhase==='return'){b.task.completedAt=s.step;s.completedTasks.push(b.task);s.tasks=s.tasks.filter(t=>t.id!==b.task.id);b.tasksCompleted++;finishTask(s,b);}
+      else if(b.task.type==='induction'){const c=(cfg.mode==='casepick'||cfg.mode==='mixed')?cfg.casesPerPallet:1;s.pallets[b.task.posId]={casesRemaining:c,conveyable:b.task.conveyable};b.task.completedAt=s.step;s.completedTasks.push(b.task);s.tasks=s.tasks.filter(t=>t.id!==b.task.id);b.tasksCompleted++;finishTask(s,b);}
+      else{delete s.pallets[b.task.posId];b.task.completedAt=s.step;s.completedTasks.push(b.task);s.tasks=s.tasks.filter(t=>t.id!==b.task.id);b.tasksCompleted++;finishTask(s,b);}}break;
+    }
+  }
+  // Operators
+  const done=new Set();
+  for(const[stn,ops]of Object.entries(s.operators)){for(const op of ops){switch(op.state){
+    case OP.IDLE:op.idleTicks++;break;
+    case OP.IDENT:op.identifyTicks++;op.stepsRemaining--;if(op.stepsRemaining<=0){op.state=OP.HANDLE;op.stepsRemaining=s.opHandleTimes[op.botId]??cfg.opHandleTimeS;}break;
+    case OP.HANDLE:op.handleTicks++;op.stepsRemaining--;if(op.stepsRemaining<=0){op.state=OP.CONFIRM;op.stepsRemaining=cfg.opConfirmTimeS;}break;
+    case OP.CONFIRM:op.confirmTicks++;op.stepsRemaining--;if(op.stepsRemaining<=0){done.add(op.botId);op.tasksCompleted++;delete s.opHandleTimes[op.botId];op.botId=-1;op.state=OP.IDLE;const q=s.opQueues[stn];if(q&&q.length){const nb=q.shift();op.state=OP.IDENT;op.botId=nb;op.stepsRemaining=cfg.opIdentifyTimeS;}}break;
+  }}}
+  // Completed bots
+  for(const bid of done){
+    const b=s.bots[bid];if(!b||!b.task)continue;
+    if(b.waitingPhase==='pickup'){const tgt=b.task.type==='induction'?b.task.posId:b.task.stnId;const p=dijkstra(g,cfg,b.nodeId,tgt);if(p){b.path=p;b.pathIndex=0;b.state=S.TRAVEL_DO;}else{b.state=S.IDLE;b.task=null;}}
+    else{
+      if(cfg.mode==='casepick'&&b.task.type==='retrieval'&&b.task.isPartial){const pi=s.pallets[b.task.posId];if(pi){pi.casesRemaining-=b.task.casesThisTrip;if(pi.casesRemaining<0)pi.casesRemaining=0;}s.totalCasesPicked+=b.task.casesThisTrip;const p=dijkstra(g,cfg,b.nodeId,b.task.posId);if(p){b.path=p;b.pathIndex=0;b.state=S.TRAVEL_DO;b.waitingPhase='return';}else{b.task.completedAt=s.step;s.completedTasks.push(b.task);s.tasks=s.tasks.filter(t=>t.id!==b.task.id);b.tasksCompleted++;finishTask(s,b);}}
+      else{if(b.task.type==='induction'){const c=(cfg.mode==='casepick'||cfg.mode==='mixed')?cfg.casesPerPallet:1;s.pallets[b.task.posId]={casesRemaining:c,conveyable:b.task.conveyable};}else{if(cfg.mode==='casepick'||cfg.mode==='mixed')s.totalCasesPicked+=b.task.casesThisTrip;delete s.pallets[b.task.posId];}b.task.completedAt=s.step;s.completedTasks.push(b.task);s.tasks=s.tasks.filter(t=>t.id!==b.task.id);b.tasksCompleted++;finishTask(s,b);}
+    }
+    if(b.waitingPhase!=='return')b.waitingPhase='';
+  }
+}
+
+// ============================================================
+// RENDERER — warehouse floor plan first, then entities
+// ============================================================
+let view={panX:0,panY:0,zoom:1};
+const KIND_CLR={AISLE_CELL:'#475569',PALLET_POSITION:'#a16207',Z_COLUMN:'#dc2626',STATION_OP:'#7c3aed',STATION_XY:'#059669',STATION_PEZ:'#d97706'};
+const KIND_ALPHA={AISLE_CELL:0.2,PALLET_POSITION:0.35,Z_COLUMN:0.5,STATION_OP:0.9,STATION_XY:0.8,STATION_PEZ:0.8};
+const BOT_CLR=['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7','#06b6d4','#ec4899','#78716c','#6366f1','#84cc16'];
+
+function fitView(c){
+  if(!graph)return;
+  const b=graph.bounds, pad=3;
+  const gw=b.maxX-b.minX+pad*2, gh=b.maxY-b.minY+pad*2;
+  const cw=c.width/(window.devicePixelRatio||1), ch=c.height/(window.devicePixelRatio||1);
+  view.zoom=Math.min(cw/gw, ch/gh)*0.92;
+  view.panX=cw/2-((b.minX+b.maxX)/2)*view.zoom;
+  view.panY=ch/2-((b.minY+b.maxY)/2)*view.zoom;
+}
+
+function toS(x,y){return[x*view.zoom+view.panX, y*view.zoom+view.panY];}
+
+function render(canvas){
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.parentElement.getBoundingClientRect();
+  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+  canvas.style.width=rect.width+'px'; canvas.style.height=rect.height+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.fillStyle='#0d1117'; ctx.fillRect(0,0,rect.width,rect.height);
+  if(!graph)return;
+
+  const cfg=readConfig();
+  const lv=cfg.levelFilter;
+  const z=view.zoom;
+
+  // ---- LAYER 1: Floor grid background ----
+  const b=graph.bounds;
+  const [flx,fly]=toS(b.minX-1.5, b.minY-1.5);
+  const [frx,fry]=toS(b.maxX+1.5, b.maxY+1.5);
+  ctx.fillStyle='#161b22';
+  ctx.fillRect(flx,fly,frx-flx,fry-fly);
+
+  // Grid lines every 1m
+  ctx.strokeStyle='#1e2530'; ctx.lineWidth=0.5;
+  const gridStep=1;
+  for(let gx=Math.floor(b.minX);gx<=Math.ceil(b.maxX);gx+=gridStep){
+    const[sx]=toS(gx,0);ctx.beginPath();ctx.moveTo(sx,fly);ctx.lineTo(sx,fry);ctx.stroke();
+  }
+  for(let gy=Math.floor(b.minY);gy<=Math.ceil(b.maxY);gy+=gridStep){
+    const[,sy]=toS(0,gy);ctx.beginPath();ctx.moveTo(flx,sy);ctx.lineTo(frx,sy);ctx.stroke();
+  }
+
+  // ---- LAYER 2: Edges (aisle paths) ----
+  ctx.lineWidth=Math.max(0.5, 1*z/10);
+  for(const e of graph.edges){
+    const na=graph.nodeMap[e.a],nb=graph.nodeMap[e.b];
+    if(!na||!nb)continue;
+    if(lv>0&&na.level!==lv&&nb.level!==lv)continue;
+    const[ax,ay]=toS(na.x,na.y);
+    const[bx,by]=toS(nb.x,nb.y);
+    ctx.strokeStyle=e.axis==='z'?'rgba(239,68,68,0.3)':'rgba(100,116,139,0.2)';
+    ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
+  }
+
+  // ---- LAYER 3: Nodes (warehouse structure) ----
+  for(const n of graph.nodes){
+    if(lv>0&&n.level!==lv)continue;
+    const[sx,sy]=toS(n.x,n.y);
+    const hw=n.sx/2*z, hh=n.sy/2*z;
+    const alpha=KIND_ALPHA[n.kind]||0.3;
+    const color=KIND_CLR[n.kind]||'#555';
+
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=color;
+
+    if(n.kind==='STATION_OP'||n.kind==='STATION_XY'||n.kind==='STATION_PEZ'){
+      // Stations: larger, rounded
+      const r=Math.max(2,3*z/10);
+      ctx.beginPath();
+      ctx.roundRect(sx-hw*1.2,sy-hh*1.2,hw*2.4,hh*2.4,r);
+      ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.strokeStyle=color;ctx.lineWidth=Math.max(1,2*z/15);ctx.stroke();
+      // Label
+      ctx.fillStyle='#fff';ctx.font=`bold ${Math.max(8,Math.min(12,z/3))}px sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(n.id.replace('op-','S').replace('xy-','X').replace('pez-','P'),sx,sy);
+    } else if(n.kind==='PALLET_POSITION'){
+      ctx.fillRect(sx-hw,sy-hh,hw*2,hh*2);
+    } else if(n.kind==='Z_COLUMN'){
+      ctx.fillRect(sx-hw,sy-hh,hw*2,hh*2);
+      ctx.globalAlpha=0.8;ctx.strokeStyle='#ef4444';ctx.lineWidth=Math.max(0.5,1*z/15);
+      ctx.strokeRect(sx-hw,sy-hh,hw*2,hh*2);
+    } else {
+      // Aisle
+      ctx.fillRect(sx-hw,sy-hh,hw*2,hh*2);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ---- LAYER 4: Pallets on positions ----
+  if(sim){
+    for(const[pid,info]of Object.entries(sim.pallets)){
+      if(!info||info.casesRemaining<=0)continue;
+      const n=graph.nodeMap[pid];
+      if(!n||n.kind!=='PALLET_POSITION')continue;
+      if(lv>0&&n.level!==lv)continue;
+      const[sx,sy]=toS(n.x,n.y);
+      const pw=n.sx*0.4*z, ph=n.sy*0.4*z;
+      ctx.fillStyle=info.conveyable?'#eab308':'#f97316';ctx.globalAlpha=0.85;
+      ctx.fillRect(sx-pw,sy-ph,pw*2,ph*2);
+      ctx.globalAlpha=1;
+      if(cfg.mode==='casepick'){
+        ctx.fillStyle='#000';ctx.font=`bold ${Math.max(7,Math.min(10,z/4))}px sans-serif`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(info.casesRemaining,sx,sy);
+      }
+    }
+  }
+
+  // ---- LAYER 5: Operator indicators at stations ----
+  if(sim){
+    for(const stn of graph.stationOps){
+      const n=graph.nodeMap[stn];
+      if(!n)continue;if(lv>0&&n.level!==lv)continue;
+      const ops=sim.operators[stn]||[];
+      const qLen=(sim.opQueues[stn]||[]).length;
+      const[sx,sy]=toS(n.x,n.y);
+      const r=Math.max(3,5*z/15);
+      for(let i=0;i<ops.length;i++){
+        const ox=sx+(i-(ops.length-1)/2)*r*2.5;
+        const oy=sy-n.sy/2*z*1.2-r-2;
+        ctx.fillStyle=ops[i].state===OP.IDLE?'#22c55e':'#a855f7';
+        ctx.beginPath();ctx.arc(ox,oy,r,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle='#fff';ctx.lineWidth=0.8;ctx.stroke();
+      }
+      if(qLen>0){
+        ctx.fillStyle='#fbbf24';ctx.font=`bold ${Math.max(9,z/3)}px sans-serif`;
+        ctx.textAlign='center';
+        ctx.fillText('Q:'+qLen,sx,sy+n.sy/2*z*1.2+12);
+      }
+    }
+  }
+
+  // ---- LAYER 6: Bots ----
+  if(sim){
+    for(const b of sim.bots){
+      const n=graph.nodeMap[b.nodeId];
+      if(!n)continue;if(lv>0&&n.level!==lv)continue;
+      const[sx,sy]=toS(n.x,n.y);
+      const r=Math.max(4, Math.min(10, 8*z/15));
+
+      // Glow
+      ctx.shadowColor=BOT_CLR[b.id%BOT_CLR.length];ctx.shadowBlur=r;
+      ctx.fillStyle=BOT_CLR[b.id%BOT_CLR.length];
+      ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;
+
+      // Outline
+      ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+
+      // ID
+      ctx.fillStyle='#fff';ctx.font=`bold ${Math.max(7,r*0.9)}px sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(b.id,sx,sy);
+
+      // State label below
+      const stNames=['idle','go-PU','wait','waitOp','pick','go-DO','wait','place'];
+      ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font=`${Math.max(6,r*0.6)}px sans-serif`;
+      ctx.fillText(stNames[b.state]||'',sx,sy+r+8);
+    }
+  }
+}
+
+// ============================================================
+// UI WIRING
+// ============================================================
+function toggleSection(el){const body=el.nextElementSibling;const sp=el.querySelector('span');body.classList.toggle('collapsed');sp.innerHTML=body.classList.contains('collapsed')?'&#9654;':'&#9660;';}
+
+document.querySelectorAll('.row input[type=range]').forEach(inp=>{
+  const vs=$('val'+inp.id.replace('cfg',''));
+  if(vs) inp.addEventListener('input',()=>{vs.textContent=inp.value;});
+});
+$('cfgMode').addEventListener('change',()=>{
+  const cp=$('cfgMode').value==='casepick'||$('cfgMode').value==='mixed';
+  $('casepickSection').style.display=cp?'':'none';
+  $('mCasesRow').style.display=cp?'':'none';
+});
+// Trigger initial state for mixed mode default
+$('casepickSection').style.display='';
+$('mCasesRow').style.display='';
+
+$('dropZone').addEventListener('click',loadDefault);
+$('dropZone').addEventListener('dragover',e=>{e.preventDefault();$('dropZone').classList.add('over');});
+$('dropZone').addEventListener('dragleave',()=>$('dropZone').classList.remove('over'));
+$('dropZone').addEventListener('drop',e=>{e.preventDefault();$('dropZone').classList.remove('over');const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=ev=>{loadGraph(JSON.parse(ev.target.result));resetSim();$('statusText').textContent=`Loaded: ${f.name} (${graph.nodes.length} nodes)`;};r.readAsText(f);}});
+
+async function loadDefault(){
+  $('statusText').textContent='Loading south zone slice...';
+  try{
+    // Try zone slice first, then full graph
+    let r=await fetch('south-zone-slice.json');
+    if(!r.ok) r=await fetch('graph.json');
+    if(!r.ok) r=await fetch('../app/public/EVT_3_31_21.json');
+    if(!r.ok) throw new Error('not found');
+    loadGraph(await r.json());
+    resetSim();
+    $('statusText').textContent=`South Zone Slice: ${graph.nodes.length} nodes, ${graph.edges.length} edges, ${graph.stationOps.length} stations`;
+    // Auto-load schedule if available
+    try{
+      const sr=await fetch('schedule.json');
+      if(sr.ok){const sd=await sr.json();loadScheduleData(sd);
+        $('schedDropZone').textContent=`Schedule: ${sd.side} ${sd.bots} bots, ${sd.pph.toFixed(0)} PPH`;
+        $('schedDropZone').style.borderColor='#238636';$('schedDropZone').style.color='#238636';}
+    }catch(e){}
+  }catch(e){$('statusText').textContent='Failed to load graph. Drop a JSON file.';}
+}
+
+function resetSim(){
+  playing=false;$('btnPlay').textContent='Play';
+  sim=createSim(graph,readConfig());
+  const c=$('canvas');fitView(c);render(c);updateMetrics();
+}
+
+function updateMetrics(){
+  if(!sim)return;const cfg=readConfig();
+  $('mTime').textContent=sim.step+'s';
+  $('mTasks').textContent=sim.completedTasks.length+' / '+sim.shiftTasksGenerated;
+  const thr=sim.step>0?(sim.completedTasks.length/(sim.step/3600)).toFixed(1):'0';
+  $('mThroughput').textContent=thr+'/hr';
+  let bs=0,ts=0;for(const b of sim.bots){bs+=b.busySteps;ts+=b.busySteps+b.idleSteps;}
+  $('mBotUtil').textContent=ts>0?Math.round(bs/ts*100)+'%':'0%';
+  let ob=0,ot=0;for(const ops of Object.values(sim.operators))for(const op of ops){const b=op.identifyTicks+op.handleTicks+op.confirmTicks;ob+=b;ot+=b+op.idleTicks;}
+  $('mOpUtil').textContent=ot>0?Math.round(ob/ot*100)+'%':'0%';
+  let tq=0;for(const q of Object.values(sim.opQueues))tq+=q.length;$('mQueue').textContent=tq;
+  if(cfg.mode==='casepick')$('mCases').textContent=sim.totalCasesPicked;
+  $('statusText').textContent=sim.shiftDone?`Done at ${sim.step}s — ${sim.completedTasks.length} tasks`:`Step ${sim.step}`;
+}
+
+$('btnPlay').addEventListener('click',()=>{if(!graph||!sim)return;playing=!playing;$('btnPlay').textContent=playing?'Pause':'Play';if(playing)animate();});
+$('btnStep').addEventListener('click',()=>{if(!graph||!sim)return;playing=false;$('btnPlay').textContent='Play';stepSim(sim,graph,readConfig());render($('canvas'));updateMetrics();});
+$('btnReset').addEventListener('click',()=>{if(!graph)return;resetSim();});
+
+function animate(){
+  if(!playing||!sim||sim.shiftDone){playing=false;$('btnPlay').textContent='Play';render($('canvas'));updateMetrics();return;}
+  const spd=+$('speed').value;const cfg=readConfig();
+  for(let i=0;i<spd;i++){if(sim.shiftDone)break;stepSim(sim,graph,cfg);}
+  render($('canvas'));updateMetrics();
+  requestAnimationFrame(animate);
+}
+
+// Pan & zoom
+let drag=false,ds={x:0,y:0};
+const cv=$('canvas');
+cv.addEventListener('mousedown',e=>{drag=true;ds={x:e.clientX-view.panX,y:e.clientY-view.panY};});
+cv.addEventListener('mousemove',e=>{if(drag){view.panX=e.clientX-ds.x;view.panY=e.clientY-ds.y;render(cv);}});
+cv.addEventListener('mouseup',()=>drag=false);
+cv.addEventListener('mouseleave',()=>drag=false);
+cv.addEventListener('wheel',e=>{e.preventDefault();const rect=cv.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;const f=e.deltaY<0?1.12:1/1.12;view.panX=mx-(mx-view.panX)*f;view.panY=my-(my-view.panY)*f;view.zoom*=f;render(cv);},{passive:false});
+window.addEventListener('resize',()=>render(cv));
+
+// ============================================================
+// SCHEDULE REPLAY MODE
+// ============================================================
+let schedData = null;  // loaded schedule JSON
+let schedSim = null;   // schedule replay state
+
+function loadScheduleData(data) {
+  schedData = data;
+  $('mWaveRow').style.display = '';
+  $('mPPHRow').style.display = '';
+  $('mProjPPH').textContent = Math.round(data.pph);
+  $('statusText').textContent = `Schedule: ${data.side} side, ${data.bots} bots/wave, ${data.pph.toFixed(0)} PPH projected`;
+
+  // Group steps by bot
+  const botSteps = {};
+  for (const s of data.steps) {
+    if (!botSteps[s.bot_id]) botSteps[s.bot_id] = [];
+    botSteps[s.bot_id].push(s);
+  }
+
+  // Create schedule sim state
+  const numWaves = +$('cfgPallets').value || 10; // reuse pallets slider as wave count
+  const svcMin = 40, svcMax = 52;
+  const bots = [];
+  let bid = 0;
+  for (let w = 0; w < numWaves; w++) {
+    for (let ci = 0; ci < data.bots; ci++) {
+      const svc = svcMin + Math.floor(Math.random() * (svcMax - svcMin + 1));
+      bots.push({
+        id: bid++, waveId: w, configIdx: ci,
+        state: 'pending', steps: [...(botSteps[ci] || [])],
+        stepIdx: 0, ticksLeft: 0,
+        waveStart: w * data.wave_offset_s,
+        serviceTime: svc, enteredAt: 0, completedAt: 0,
+        nodeId: data.bot_configs[ci].entry || data.bot_configs[ci].spawn,
+      });
+    }
+  }
+
+  schedSim = {
+    tick: 0, bots, completed: 0, totalWaves: numWaves,
+    opBusy: {}, opQueue: {},
+  };
+  for (const bc of data.bot_configs) {
+    schedSim.opBusy[bc.op] = false;
+    schedSim.opQueue[bc.op] = [];
+  }
+}
+
+function stepScheduleSim() {
+  if (!schedSim || !schedData) return;
+  const s = schedSim;
+  s.tick++;
+
+  for (const b of s.bots) {
+    switch (b.state) {
+    case 'pending':
+      if (s.tick >= b.waveStart) {
+        b.state = 'traveling'; b.stepIdx = 0;
+        b.nodeId = b.steps[0].cell_id;
+        b.ticksLeft = b.steps[0].duration;
+        b.enteredAt = s.tick;
+      }
+      break;
+    case 'traveling':
+      b.ticksLeft--;
+      if (b.ticksLeft <= 0) {
+        b.stepIdx++;
+        if (b.stepIdx >= b.steps.length) {
+          b.state = 'done'; b.completedAt = s.tick; s.completed++; break;
+        }
+        const step = b.steps[b.stepIdx];
+        b.nodeId = step.cell_id;
+        const bc = schedData.bot_configs[b.configIdx];
+        if (step.cell_id === bc.op) {
+          b.state = 'waiting_op';
+          if (!s.opBusy[bc.op]) {
+            s.opBusy[bc.op] = true;
+            b.state = 'at_op'; b.ticksLeft = b.serviceTime;
+          } else {
+            s.opQueue[bc.op].push(b);
+          }
+        } else {
+          b.ticksLeft = step.duration;
+        }
+      }
+      break;
+    case 'at_op': {
+      b.ticksLeft--;
+      if (b.ticksLeft <= 0) {
+        const bc = schedData.bot_configs[b.configIdx];
+        s.opBusy[bc.op] = false;
+        const q = s.opQueue[bc.op];
+        if (q.length > 0) {
+          const next = q.shift();
+          s.opBusy[bc.op] = true;
+          next.state = 'at_op'; next.ticksLeft = next.serviceTime;
+        }
+        b.stepIdx++;
+        if (b.stepIdx >= b.steps.length) {
+          b.state = 'done'; b.completedAt = s.tick; s.completed++; break;
+        }
+        b.state = 'departing';
+        b.nodeId = b.steps[b.stepIdx].cell_id;
+        b.ticksLeft = b.steps[b.stepIdx].duration;
+      }
+      break;
+    }
+    case 'departing':
+      b.ticksLeft--;
+      if (b.ticksLeft <= 0) {
+        b.stepIdx++;
+        if (b.stepIdx >= b.steps.length) {
+          b.state = 'done'; b.completedAt = s.tick; s.completed++; break;
+        }
+        b.nodeId = b.steps[b.stepIdx].cell_id;
+        b.ticksLeft = b.steps[b.stepIdx].duration;
+      }
+      break;
+    }
+  }
+}
+
+// Override render and animate for schedule mode
+const origAnimate = animate;
+function animateSched() {
+  if (!playing || !schedSim) { playing = false; $('btnPlay').textContent = 'Play'; render($('canvas')); updateSchedMetrics(); return; }
+  const spd = +$('speed').value;
+  for (let i = 0; i < spd; i++) stepScheduleSim();
+
+  // Update sim bots for renderer — map schedSim bots to sim.bots format
+  if (sim) {
+    sim.bots = schedSim.bots.filter(b => b.state !== 'pending' && b.state !== 'done').map(b => ({
+      id: b.id, state: b.state === 'at_op' ? S.WAIT_OP : b.state === 'waiting_op' ? S.WAIT_OP : b.state === 'departing' ? S.TRAVEL_DO : S.TRAVEL_PU,
+      nodeId: b.nodeId, idleSteps: 0, busySteps: 1, tasksCompleted: 0,
+    }));
+  }
+  render($('canvas'));
+  updateSchedMetrics();
+  requestAnimationFrame(animateSched);
+}
+
+function updateSchedMetrics() {
+  if (!schedSim) return;
+  $('mTime').textContent = schedSim.tick + 's';
+  $('mTasks').textContent = schedSim.completed + '/' + schedSim.bots.length;
+  const thr = schedSim.tick > 0 ? (schedSim.completed / (schedSim.tick / 3600)).toFixed(0) : '0';
+  $('mThroughput').textContent = thr + '/hr';
+  const curWave = Math.floor(schedSim.tick / schedData.wave_offset_s);
+  $('mWave').textContent = Math.min(curWave + 1, schedSim.totalWaves) + '/' + schedSim.totalWaves;
+  let tq = 0;
+  for (const q of Object.values(schedSim.opQueue)) tq += q.length;
+  $('mQueue').textContent = tq;
+
+  const active = schedSim.bots.filter(b => b.state === 'at_op').length;
+  const total = schedData.bot_configs.length;
+  $('mOpUtil').textContent = total > 0 ? Math.round(active / total * 100) + '%' : '0%';
+  $('mBotUtil').textContent = schedSim.bots.filter(b => b.state !== 'pending' && b.state !== 'done').length + ' active';
+
+  if (schedSim.completed >= schedSim.bots.length) {
+    $('statusText').textContent = `Done: ${schedSim.completed} pallets in ${schedSim.tick}s (${thr}/hr actual vs ${Math.round(schedData.pph)}/hr projected)`;
+  } else {
+    $('statusText').textContent = `Wave ${Math.min(curWave+1, schedSim.totalWaves)}/${schedSim.totalWaves} — ${schedSim.completed} done — ${thr}/hr`;
+  }
+}
+
+// Schedule drop zone wiring
+$('schedDropZone').addEventListener('dragover', e => { e.preventDefault(); $('schedDropZone').classList.add('over'); });
+$('schedDropZone').addEventListener('dragleave', () => $('schedDropZone').classList.remove('over'));
+$('schedDropZone').addEventListener('drop', e => {
+  e.preventDefault();
+  $('schedDropZone').classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) {
+    const r = new FileReader();
+    r.onload = ev => {
+      const data = JSON.parse(ev.target.result);
+      if (!graph) { alert('Load graph first!'); return; }
+      loadScheduleData(data);
+      $('schedDropZone').textContent = `Schedule loaded: ${data.side} ${data.bots} bots, ${data.pph.toFixed(0)} PPH`;
+      $('schedDropZone').style.borderColor = '#238636';
+      $('schedDropZone').style.color = '#238636';
+    };
+    r.readAsText(f);
+  }
+});
+
+// Override play button to use schedule mode when schedule is loaded
+const origPlayHandler = $('btnPlay').onclick;
+$('btnPlay').addEventListener('click', function schedPlayOverride(e) {
+  if (schedSim && schedData) {
+    e.stopImmediatePropagation();
+    playing = !playing;
+    $('btnPlay').textContent = playing ? 'Pause' : 'Play';
+    if (playing) animateSched();
+  }
+}, true);
+
+$('btnStep').addEventListener('click', function schedStepOverride(e) {
+  if (schedSim && schedData) {
+    e.stopImmediatePropagation();
+    playing = false;
+    $('btnPlay').textContent = 'Play';
+    stepScheduleSim();
+    if (sim) {
+      sim.bots = schedSim.bots.filter(b => b.state !== 'pending' && b.state !== 'done').map(b => ({
+        id: b.id, state: S.TRAVEL_PU, nodeId: b.nodeId, idleSteps: 0, busySteps: 1, tasksCompleted: 0,
+      }));
+    }
+    render($('canvas'));
+    updateSchedMetrics();
+  }
+}, true);
+
+$('btnReset').addEventListener('click', function schedResetOverride(e) {
+  if (schedData) {
+    e.stopImmediatePropagation();
+    playing = false;
+    $('btnPlay').textContent = 'Play';
+    loadScheduleData(schedData);
+    if (sim) sim.bots = [];
+    render($('canvas'));
+    updateSchedMetrics();
+  }
+}, true);
+
+// ============================================================
+// CP-SAT SOLVER INTEGRATION
+// ============================================================
+
+function readSolverConfig() {
+  return {
+    slice: $('cfgSlice').value,
+    serviceTime: +$('cfgSvcTime').value,
+    timeBuffer: +$('cfgBuffer').value,
+    bots: +$('cfgSolverBots').value,
+    waves: +$('cfgSolverWaves').value,
+    xySpeed: +$('cfgBotSpeed').value,
+    xyAccel: 1.5,
+    loadedAccel: 0.3,
+    // Handle times (pre-drop)
+    svcCaseConv: +$('cfgSvcCaseConv').value,
+    svcCaseNcv: +$('cfgSvcCaseNcv').value,
+    svcCasepickConv: +$('cfgSvcCpConv').value,
+    svcCasepickNcvBin: +$('cfgSvcCpNcv').value,
+    svcCasepickNcvRepal: +$('cfgSvcCpNcv').value,
+    // Drop-off times (added to handle)
+    dropConveyor: +$('cfgDropConveyor').value,
+    dropBin: +$('cfgDropBin').value,
+    dropRepal: +$('cfgDropRepal').value,
+    maxBots: +$('cfgSweepMaxBots').value,
+    maxWaves: +$('cfgSweepMaxWaves').value,
+  };
+}
+
+// Filter visible sections based on slice mode
+$('cfgSlice').addEventListener('change', () => {
+  const cp = $('cfgSlice').value === 'casepick';
+  $('caseSubtypeSection').style.display = cp ? 'none' : '';
+  // Also auto-load appropriate slice
+  autoLoadSliceGraph();
+});
+
+async function autoLoadSliceGraph() {
+  const slice = $('cfgSlice').value;
+  const path = slice === 'casepick' ? 'casepick-slice.json' : 'south-zone-slice.json';
+  try {
+    const r = await fetch(path);
+    if (r.ok) {
+      loadGraph(await r.json());
+      resetSim();
+      $('statusText').textContent = `${slice} slice: ${graph.nodes.length} nodes, ${graph.edges.length} edges, ${graph.stationOps.length} stations`;
+    }
+  } catch(e) {}
+}
+
+async function solveSchedule() {
+  const cfg = readSolverConfig();
+  $('statusText').textContent = 'Running CP-SAT solver...';
+  $('btnSolve').disabled = true;
+  try {
+    const resp = await fetch('/api/solve', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(cfg),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      $('statusText').textContent = `Solver error: ${data.error}`;
+      console.error(data);
+    } else {
+      loadScheduleData(data);
+      $('statusText').textContent = `CP-SAT done in ${data._elapsed_s}s: ${data.bots} bots, ${data.pph.toFixed(0)} PPH projected`;
+    }
+  } catch(e) {
+    $('statusText').textContent = `Request failed: ${e.message}`;
+  } finally {
+    $('btnSolve').disabled = false;
+  }
+}
+
+async function runSweep() {
+  const cfg = readSolverConfig();
+  $('statusText').textContent = 'Running fleet sweep (may take minutes)...';
+  $('btnSweep').disabled = true;
+  $('sweepResults').innerHTML = '<em style="color:#666">Running...</em>';
+  try {
+    const resp = await fetch('/api/sweep', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(cfg),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      $('statusText').textContent = `Sweep error: ${data.error}`;
+      $('sweepResults').innerHTML = `<div style="color:#f85149">${data.error}</div>`;
+      console.error(data);
+    } else {
+      renderSweepResults(data);
+      $('statusText').textContent = `Sweep done in ${data._elapsed_s}s — ${data.results.length} bot counts tested`;
+    }
+  } catch(e) {
+    $('statusText').textContent = `Request failed: ${e.message}`;
+  } finally {
+    $('btnSweep').disabled = false;
+  }
+}
+
+function renderSweepResults(data) {
+  const isCp = data.results[0] && !('case_conv' in (data.results[0].subtype_pph || {}));
+  let html = `<table style="width:100%;border-collapse:collapse;color:#c9d1d9">`;
+  html += `<tr style="background:#161b22"><th style="text-align:right;padding:3px">Bots</th><th style="text-align:right">W</th><th style="text-align:right">Off</th><th style="text-align:right">PPH</th>`;
+  if (isCp) {
+    html += `<th style="text-align:right">CPConv</th><th style="text-align:right">CPBin</th><th style="text-align:right">CPRepal</th>`;
+  } else {
+    html += `<th style="text-align:right">CaseC</th><th style="text-align:right">CaseN</th><th style="text-align:right">CPCon</th><th style="text-align:right">CPBin</th><th style="text-align:right">CPRep</th>`;
+  }
+  html += `</tr>`;
+  for (const r of data.results) {
+    const sp = r.subtype_pph || {};
+    html += `<tr><td style="text-align:right;padding:3px;color:#58a6ff">${r.bots}</td>`;
+    html += `<td style="text-align:right">${r.best_waves}</td>`;
+    html += `<td style="text-align:right">${r.wave_offset_s}s</td>`;
+    html += `<td style="text-align:right;color:#7ee787"><b>${r.best_pph.toFixed(0)}</b></td>`;
+    if (isCp) {
+      html += `<td style="text-align:right">${(sp.casepick_conv||0).toFixed(0)}</td>`;
+      html += `<td style="text-align:right">${(sp.casepick_ncv_bin||0).toFixed(0)}</td>`;
+      html += `<td style="text-align:right">${(sp.casepick_ncv_repal||0).toFixed(0)}</td>`;
+    } else {
+      html += `<td style="text-align:right">${(sp.case_conv||0).toFixed(0)}</td>`;
+      html += `<td style="text-align:right">${(sp.case_ncv||0).toFixed(0)}</td>`;
+      html += `<td style="text-align:right">${(sp.casepick_conv||0).toFixed(0)}</td>`;
+      html += `<td style="text-align:right">${(sp.casepick_ncv_bin||0).toFixed(0)}</td>`;
+      html += `<td style="text-align:right">${(sp.casepick_ncv_repal||0).toFixed(0)}</td>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</table>`;
+  html += `<div style="margin-top:4px;color:#8b949e;font-size:9px">W=waves, Off=wave offset, PPH=default throughput. Service times per subtype: conv/ncv/bin/repal</div>`;
+  $('sweepResults').innerHTML = html;
+}
+
+$('btnSolve').addEventListener('click', solveSchedule);
+$('btnSweep').addEventListener('click', runSweep);
+
+// Init filters
+if ($('cfgSlice').value === 'casepick') {
+  $('caseSubtypeSection').style.display = 'none';
+}
+
+loadDefault();
+</script>
+</body>
+</html>

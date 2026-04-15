@@ -92,7 +92,7 @@ func findDeepestAisleCell(zoneRaw *RawGraph, row int) string {
 
 type ZoneBot struct {
 	ID             int
-	State          string // "waiting", "to_station", "at_station", "to_exit", "done"
+	State          string // "waiting", "to_station", "waiting_for_op", "at_station", "to_exit", "done"
 	CurrentNodeID  string
 	Path           []string
 	PathIndex      int
@@ -102,13 +102,23 @@ type ZoneBot struct {
 	WaitTicks      int
 }
 
+// ZoneOperator is a simple operator for the zone sim.
+type ZoneOperator struct {
+	BotID          int // -1 when idle
+	StepsRemaining int
+	IdleTicks      int
+	BusyTicks      int
+}
+
 type ZoneResult struct {
 	Zone            string
 	BotsPerStation  int
+	OpsPerStation   int
 	CompletedTasks  int
 	AvgCycleTimeS   float64
 	ThroughputPerHr float64
 	AvgWaitPct      float64
+	OpUtilPct       float64
 	Steps           int
 }
 
@@ -121,6 +131,7 @@ func runZoneSim(
 	palletCount int,
 	cfg SimConfig,
 	seed int64,
+	opsPerStation int,
 ) ZoneResult {
 	maxY := 10.0
 	zoneRaw, nodeIndex := extractSouthZone(raw, maxY)
@@ -158,6 +169,17 @@ func runZoneSim(
 	for i := range bots {
 		bots[i] = &ZoneBot{ID: i, State: "waiting"}
 	}
+
+	// Operator pool for this station.
+	var zoneOps []*ZoneOperator
+	var opQueue []int // FIFO of bot IDs waiting for operator
+	if opsPerStation > 0 {
+		zoneOps = make([]*ZoneOperator, opsPerStation)
+		for i := range zoneOps {
+			zoneOps[i] = &ZoneOperator{BotID: -1}
+		}
+	}
+	serviceTime := cfg.OpIdentifyTimeS + cfg.OpHandleTimeS + cfg.OpConfirmTimeS
 
 	completedBots := 0
 	totalCycleTime := 0
@@ -204,10 +226,33 @@ func runZoneSim(
 			}
 
 			switch b.State {
+			case "waiting_for_op":
+				// Waiting for operator — handled by operator step below.
+				b.WaitTicks++
+
 			case "to_station":
 				if b.PathIndex >= len(b.Path)-1 {
-					b.State = "at_station"
-					b.StepsRemaining = cfg.StationPickTimeS
+					if len(zoneOps) > 0 {
+						// Try to get an operator immediately.
+						assigned := false
+						for _, op := range zoneOps {
+							if op.BotID == -1 {
+								op.BotID = b.ID
+								op.StepsRemaining = serviceTime
+								b.State = "at_station"
+								b.StepsRemaining = serviceTime
+								assigned = true
+								break
+							}
+						}
+						if !assigned {
+							b.State = "waiting_for_op"
+							opQueue = append(opQueue, b.ID)
+						}
+					} else {
+						b.State = "at_station"
+						b.StepsRemaining = cfg.StationPickTimeS
+					}
 					continue
 				}
 				nextNode := b.Path[b.PathIndex+1]
@@ -271,6 +316,30 @@ func runZoneSim(
 				}
 			}
 		}
+
+		// Advance zone operators: free completed, assign queued.
+		for _, op := range zoneOps {
+			if op.BotID >= 0 {
+				op.BusyTicks++
+				op.StepsRemaining--
+				if op.StepsRemaining <= 0 {
+					op.BotID = -1
+					// Assign next queued bot.
+					if len(opQueue) > 0 {
+						nextID := opQueue[0]
+						opQueue = opQueue[1:]
+						op.BotID = nextID
+						op.StepsRemaining = serviceTime
+						bots[nextID].State = "at_station"
+						bots[nextID].StepsRemaining = serviceTime
+					}
+				}
+			} else {
+				op.IdleTicks++
+			}
+		}
+		// Track wait ticks for bots still in queue.
+		totalWaitTicks += len(opQueue)
 	}
 
 	avgCycle := 0.0
@@ -286,13 +355,27 @@ func runZoneSim(
 		avgWait = float64(totalWaitTicks) / float64(totalCycleTime) * 100
 	}
 
+	opUtil := 0.0
+	if len(zoneOps) > 0 {
+		var utilSum float64
+		for _, op := range zoneOps {
+			total := op.BusyTicks + op.IdleTicks
+			if total > 0 {
+				utilSum += float64(op.BusyTicks) / float64(total)
+			}
+		}
+		opUtil = utilSum / float64(len(zoneOps)) * 100
+	}
+
 	return ZoneResult{
 		Zone:            zone.Name,
 		BotsPerStation:  numBots,
+		OpsPerStation:   opsPerStation,
 		CompletedTasks:  completedBots,
 		AvgCycleTimeS:   avgCycle,
 		ThroughputPerHr: throughput,
 		AvgWaitPct:      avgWait,
+		OpUtilPct:       opUtil,
 		Steps:           step,
 	}
 }
@@ -349,6 +432,10 @@ func runZoneAnalysis(mapPath string, pallets int, shifts int) {
 
 	botCounts := []int{1, 2, 3, 4, 5, 6, 8, 10, 12, 15}
 	cfg := defaultSimConfig
+	if cfg.OperatorsPerStation > 0 {
+		fmt.Printf("Operators: %d per station (identify=%ds handle=%ds confirm=%ds)\n\n",
+			cfg.OperatorsPerStation, cfg.OpIdentifyTimeS, cfg.OpHandleTimeS, cfg.OpConfirmTimeS)
+	}
 	startTime := time.Now()
 
 	type row struct {
@@ -363,7 +450,7 @@ func runZoneAnalysis(mapPath string, pallets int, shifts int) {
 			var results []ZoneResult
 			for s := 0; s < shifts; s++ {
 				seed := int64(zone.EntryRow*10000 + bc*100 + s)
-				r := runZoneSim(raw, zone, bc, pallets, cfg, seed)
+				r := runZoneSim(raw, zone, bc, pallets, cfg, seed, cfg.OperatorsPerStation)
 				results = append(results, r)
 			}
 			allRows = append(allRows, row{zone.Name, bc, results})

@@ -12,3 +12,15 @@ app/public/wasm_exec.js
 
 # Local Go install
 .local/
+
+# Go build artifacts
+cmd/calibrate/evt-sim-calibrate
+cmd/calibrate/calibrate
+*.test
+
+# Local large graph copies (original lives in loom repo)
+station-sim/graph.json
+
+# Python cache
+__pycache__/
+*.pyc

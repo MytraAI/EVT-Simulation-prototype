@@ -1,0 +1,350 @@
+{
+  "side": "north",
+  "bots": 2,
+  "waves": 2,
+  "wave_offset_s": 73,
+  "makespan_s": 465,
+  "pph": 98.6,
+  "steps": [
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-34",
+      "start": 0,
+      "end": 5,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-35",
+      "start": 5,
+      "end": 10,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-36",
+      "start": 10,
+      "end": 15,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-37",
+      "start": 15,
+      "end": 20,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-38",
+      "start": 20,
+      "end": 25,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-39",
+      "start": 25,
+      "end": 30,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-40",
+      "start": 30,
+      "end": 35,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-41",
+      "start": 35,
+      "end": 40,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-42",
+      "start": 40,
+      "end": 45,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-43",
+      "start": 45,
+      "end": 50,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-44",
+      "start": 50,
+      "end": 109,
+      "duration": 8
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "p-1-44-16-0",
+      "start": 109,
+      "end": 180,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-15-44",
+      "start": 180,
+      "end": 219,
+      "duration": 8
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-15-45",
+      "start": 219,
+      "end": 224,
+      "duration": 5
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "xy-15-46",
+      "start": 224,
+      "end": 232,
+      "duration": 8
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "op-16-46",
+      "start": 232,
+      "end": 278,
+      "duration": 46
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "xy-15-46",
+      "start": 278,
+      "end": 284,
+      "duration": 6
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-15-45",
+      "start": 284,
+      "end": 290,
+      "duration": 6
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "p-1-45-16-0",
+      "start": 290,
+      "end": 292,
+      "duration": 2
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-17-45",
+      "start": 292,
+      "end": 294,
+      "duration": 2
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "p-1-45-18-0",
+      "start": 294,
+      "end": 296,
+      "duration": 2
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-19-45",
+      "start": 296,
+      "end": 302,
+      "duration": 6
+    },
+    {
+      "bot_id": 0,
+      "cell_id": "a-1-19-46",
+      "start": 302,
+      "end": 303,
+      "duration": 1
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-19-46",
+      "start": 0,
+      "end": 5,
+      "duration": 5
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-19-45",
+      "start": 5,
+      "end": 13,
+      "duration": 8
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "p-1-45-18-0",
+      "start": 13,
+      "end": 18,
+      "duration": 5
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-17-45",
+      "start": 18,
+      "end": 23,
+      "duration": 5
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "p-1-45-16-0",
+      "start": 23,
+      "end": 28,
+      "duration": 5
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-15-45",
+      "start": 28,
+      "end": 37,
+      "duration": 9
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "xy-15-46",
+      "start": 37,
+      "end": 45,
+      "duration": 8
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "op-16-46",
+      "start": 45,
+      "end": 91,
+      "duration": 46
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "xy-15-46",
+      "start": 91,
+      "end": 97,
+      "duration": 6
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-15-45",
+      "start": 97,
+      "end": 99,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-15-44",
+      "start": 99,
+      "end": 105,
+      "duration": 6
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "p-1-44-14-0",
+      "start": 105,
+      "end": 108,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-44",
+      "start": 108,
+      "end": 114,
+      "duration": 6
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-43",
+      "start": 114,
+      "end": 116,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-42",
+      "start": 116,
+      "end": 118,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-41",
+      "start": 118,
+      "end": 120,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-40",
+      "start": 120,
+      "end": 122,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-39",
+      "start": 122,
+      "end": 124,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-38",
+      "start": 124,
+      "end": 126,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-37",
+      "start": 126,
+      "end": 128,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-36",
+      "start": 128,
+      "end": 130,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-35",
+      "start": 130,
+      "end": 132,
+      "duration": 2
+    },
+    {
+      "bot_id": 1,
+      "cell_id": "a-1-13-34",
+      "start": 132,
+      "end": 133,
+      "duration": 1
+    }
+  ],
+  "bot_configs": [
+    {
+      "xy": "xy-15-46",
+      "op": "op-16-46",
+      "pez": "pez-14-46",
+      "type": "OB",
+      "entry": "a-1-17-34",
+      "exit": "a-1-19-46"
+    },
+    {
+      "xy": "xy-15-46",
+      "op": "op-16-46",
+      "pez": "pez-14-46",
+      "type": "OB",
+      "entry": "a-1-19-46",
+      "exit": "a-1-13-34"
+    }
+  ]
+}

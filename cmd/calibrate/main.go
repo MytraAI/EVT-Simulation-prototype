@@ -100,6 +100,7 @@ const (
 	BotIdle BotState = iota
 	BotTravelingToPickup
 	BotEdgeWait
+	BotWaitingForOperator // queued at station for operator service
 	BotPicking
 	BotTravelingToDropoff
 	BotEdgeWaitDrop
@@ -116,6 +117,7 @@ type Bot struct {
 	StepsRemaining      int
 	EdgeWaitTicks       int
 	CollisionWaitTicks  int
+	WaitingPhase        string // "pickup" or "dropoff" when in BotWaitingForOperator
 	TotalIdleSteps      int
 	TotalBusySteps      int
 	TotalCollisionWaits int
@@ -138,6 +140,15 @@ type Task struct {
 	AssignedBotID   int
 	CreatedAtStep   int
 	CompletedAtStep int
+	// Casepick (PICO) fields.
+	CasesPickedThisTrip int  // cases being picked on this retrieval trip
+	IsPartialReturn     bool // true if pallet goes back to storage after this trip
+	Conveyable          bool // pallet type for this task
+}
+
+type PalletInfo struct {
+	CasesRemaining int  // 1 for PIPO, CasesPerPallet for PICO
+	Conveyable     bool // true = conveyable, false = non-conveyable (manual handling)
 }
 
 type SimConfig struct {
@@ -154,6 +165,24 @@ type SimConfig struct {
 	PositionDropTimeS  int
 	ShiftPalletCount   int
 	InitialFillPct     float64
+	// Operator modeling (0 = disabled, uses flat station delays).
+	OperatorsPerStation int
+	OpIdentifyTimeS     int
+	OpHandleTimeS       int
+	OpConfirmTimeS      int
+	// Station mode: "pallet", "casepick", or "mixed" (per-station assignment).
+	Mode             string // "pallet", "casepick", or "mixed"
+	SouthOnly        bool   // focus on south side stations only
+	CasepickStations string // comma-separated station IDs for casepick (mixed mode)
+	CasesPerPallet   int
+	CasesPerPick     int
+	PickTimePerCaseS int
+	// Conveyable vs non-conveyable pallet handling.
+	ConveyablePct         int // 0-100, percentage of pallets that are conveyable
+	OpHandleConveyableS   int // operator handle time for conveyable pallets (faster, conveyor-assisted)
+	OpHandleNonConveyS    int // operator handle time for non-conveyable pallets (manual)
+	PickTimePerCaseNCS    int // per-case pick time for non-conveyable (casepick mode)
+	BinRepalletizeTimeS   int // extra time for binning/repalletizing non-conveyable cases (casepick mode)
 }
 
 var defaultSimConfig = SimConfig{
@@ -163,6 +192,11 @@ var defaultSimConfig = SimConfig{
 	StationPickTimeS: 8, StationDropTimeS: 6,
 	PositionPickTimeS: 4, PositionDropTimeS: 5,
 	ShiftPalletCount: 100, InitialFillPct: 0.0,
+	OperatorsPerStation: 1, // 1 operator per station — bots queue for service
+	OpIdentifyTimeS: 5, OpHandleTimeS: 3, OpConfirmTimeS: 3,
+	Mode: "pallet", CasesPerPallet: 24, CasesPerPick: 4, PickTimePerCaseS: 3,
+	ConveyablePct: 60, OpHandleConveyableS: 3, OpHandleNonConveyS: 8,
+	PickTimePerCaseNCS: 5, BinRepalletizeTimeS: 10,
 }
 
 type SimState struct {
@@ -170,11 +204,14 @@ type SimState struct {
 	Bots                []*Bot
 	Tasks               []*Task
 	CompletedTasks      []*Task
-	Pallets             map[string]bool
+	Pallets             map[string]*PalletInfo
 	BotPositions        map[string]int // nodeID -> botID
 	ShiftTasksGenerated int
 	ShiftDone           bool
 	TaskCounter         int
+
+	// Per-station mode: "pallet" or "casepick"
+	StationMode map[string]string
 
 	// Station congestion tracking
 	StationBusyTicks map[string]int // station -> ticks a bot was operating there
@@ -189,6 +226,10 @@ type SimState struct {
 	ZoneGatewaySum  map[string]int    // station -> cumulative bots-at-gateway-ticks
 	ZoneGatewayMax  map[string]int    // station -> peak bots at gateway
 	GatewayNodes    map[string]string // STATION_XY nodeID -> stationOp ID
+
+	// Operator modeling (nil when OperatorsPerStation == 0).
+	Operators  *StationOperators
+	isStation  map[string]bool // quick lookup for STATION_OP nodes
 
 	graph           *DirectedGraph
 	raw             *RawGraph
@@ -211,6 +252,10 @@ func newSimState(raw *RawGraph, g *DirectedGraph, cfg SimConfig, seed int64) *Si
 		nodeIndex[n.ID] = n
 		switch n.Kind {
 		case "STATION_OP":
+			// Filter to south side only if configured
+			if cfg.SouthOnly && n.Position.YM < 50 {
+				continue
+			}
 			stationOps = append(stationOps, n.ID)
 		case "PALLET_POSITION":
 			palletPositions = append(palletPositions, n.ID)
@@ -232,11 +277,16 @@ func newSimState(raw *RawGraph, g *DirectedGraph, cfg SimConfig, seed int64) *Si
 		botPositions[startNode] = i
 	}
 
-	pallets := make(map[string]bool)
+	pallets := make(map[string]*PalletInfo)
 	fillCount := int(float64(len(palletPositions)) * cfg.InitialFillPct)
 	perm := rng.Perm(len(palletPositions))
+	initCases := 1
+	if cfg.Mode == "casepick" {
+		initCases = cfg.CasesPerPallet
+	}
 	for i := 0; i < fillCount && i < len(perm); i++ {
-		pallets[palletPositions[perm[i]]] = true
+		conv := rng.Intn(100) < cfg.ConveyablePct
+		pallets[palletPositions[perm[i]]] = &PalletInfo{CasesRemaining: initCases, Conveyable: conv}
 	}
 
 	stBusy := make(map[string]int, len(stationOps))
@@ -293,13 +343,43 @@ func newSimState(raw *RawGraph, g *DirectedGraph, cfg SimConfig, seed int64) *Si
 	zoneGwSum := make(map[string]int, len(stationOps))
 	zoneGwMax := make(map[string]int, len(stationOps))
 
+	// Operator modeling.
+	isStn := make(map[string]bool, len(stationOps))
+	for _, sid := range stationOps {
+		isStn[sid] = true
+	}
+	var opPool *StationOperators
+	if cfg.OperatorsPerStation > 0 {
+		opPool = newStationOperators(stationOps, cfg.OperatorsPerStation, cfg)
+	}
+
+	// Per-station mode assignment.
+	stnMode := make(map[string]string, len(stationOps))
+	casepickSet := make(map[string]bool)
+	if cfg.CasepickStations != "" {
+		for _, s := range strings.Split(cfg.CasepickStations, ",") {
+			casepickSet[strings.TrimSpace(s)] = true
+		}
+	}
+	for _, sid := range stationOps {
+		if cfg.Mode == "casepick" {
+			stnMode[sid] = "casepick"
+		} else if cfg.Mode == "mixed" && casepickSet[sid] {
+			stnMode[sid] = "casepick"
+		} else {
+			stnMode[sid] = "pallet"
+		}
+	}
+
 	return &SimState{
 		Bots: bots, Tasks: make([]*Task, 0), CompletedTasks: make([]*Task, 0),
 		Pallets: pallets, BotPositions: botPositions,
+		StationMode: stnMode,
 		StationBusyTicks: stBusy, StationQueueSum: stQueue,
 		StationMaxQueue: stMax, StationTasks: stTasks,
 		NodeZone: nodeZone, ZoneBotSum: zoneBotSum, ZoneMaxBots: zoneMaxBots,
 		ZoneGatewaySum: zoneGwSum, ZoneGatewayMax: zoneGwMax, GatewayNodes: stationXYs,
+		Operators: opPool, isStation: isStn,
 		graph: g, raw: raw, adjIndex: BuildAdjIndex(raw), nodeIndex: nodeIndex, rng: rng,
 		stationOps: stationOps, palletPositions: palletPositions, aisles: aisles,
 		heurCache: make(map[string]map[string]float64),
@@ -310,13 +390,34 @@ func newSimState(raw *RawGraph, g *DirectedGraph, cfg SimConfig, seed int64) *Si
 
 // Fill-then-drain: first half inductions, second half retrievals.
 // This guarantees every task can be fulfilled.
+// In casepick (PICO) mode, all pallets are inducted first, then retrievals
+// keep generating until every pallet is fully depleted.
+// pickStation returns a station ID for the given task type in the current mode.
+func (s *SimState) pickStation(cfg SimConfig, isCasepickTask bool) string {
+	if cfg.Mode != "mixed" {
+		return s.stationOps[s.rng.Intn(len(s.stationOps))]
+	}
+	// Mixed mode: route to appropriate station type
+	var candidates []string
+	for _, sid := range s.stationOps {
+		smode := s.StationMode[sid]
+		if isCasepickTask && smode == "casepick" {
+			candidates = append(candidates, sid)
+		} else if !isCasepickTask && smode == "pallet" {
+			candidates = append(candidates, sid)
+		}
+	}
+	if len(candidates) == 0 {
+		// Fallback: any station
+		return s.stationOps[s.rng.Intn(len(s.stationOps))]
+	}
+	return candidates[s.rng.Intn(len(candidates))]
+}
+
 func (s *SimState) generateTask(cfg SimConfig) *Task {
 	if len(s.stationOps) == 0 {
 		return nil
 	}
-
-	station := s.stationOps[s.rng.Intn(len(s.stationOps))]
-	half := cfg.ShiftPalletCount / 2
 
 	// Build sets of targeted positions
 	inductTargets := make(map[string]bool)
@@ -329,40 +430,63 @@ func (s *SimState) generateTask(cfg SimConfig) *Task {
 		}
 	}
 
-	// First half: inductions. Second half: retrievals.
-	wantInduction := s.ShiftTasksGenerated < half
+	// Determine induction cap: mixed mode uses all pallets as inductions first.
+	var inductionCap int
+	if cfg.Mode == "casepick" || cfg.Mode == "mixed" {
+		inductionCap = cfg.ShiftPalletCount
+	} else {
+		inductionCap = cfg.ShiftPalletCount / 2
+	}
+	wantInduction := s.ShiftTasksGenerated < inductionCap
 
 	if wantInduction {
+		station := s.pickStation(cfg, false) // inductions go to any pallet station
 		perm := s.rng.Perm(len(s.palletPositions))
 		for _, idx := range perm {
 			pid := s.palletPositions[idx]
-			if !s.Pallets[pid] && !inductTargets[pid] {
+			if s.Pallets[pid] == nil && !inductTargets[pid] {
 				s.TaskCounter++
+				conv := s.rng.Intn(100) < cfg.ConveyablePct
 				return &Task{
 					ID: s.TaskCounter, Type: TaskInduction, SKU: "SKU-001",
 					StationNodeID: station, PositionNodeID: pid,
 					AssignedBotID: -1, CreatedAtStep: s.Step, CompletedAtStep: -1,
+					Conveyable: conv,
 				}
 			}
 		}
-		return nil // no empty positions
+		return nil
 	}
 
-	// Retrieval phase
+	// Retrieval phase: find pallets with cases remaining.
 	candidates := make([]string, 0)
-	for pid := range s.Pallets {
-		if !retrieveTargets[pid] {
+	for pid, info := range s.Pallets {
+		if !retrieveTargets[pid] && info != nil && info.CasesRemaining > 0 {
 			candidates = append(candidates, pid)
 		}
 	}
 	if len(candidates) > 0 {
 		pid := candidates[s.rng.Intn(len(candidates))]
 		s.TaskCounter++
-		return &Task{
+		pInfo := s.Pallets[pid]
+		// In mixed mode, non-conveyable → casepick station, conveyable → pallet station
+		isCasepickRetrieval := (cfg.Mode == "casepick") || (cfg.Mode == "mixed" && !pInfo.Conveyable)
+		station := s.pickStation(cfg, isCasepickRetrieval)
+		task := &Task{
 			ID: s.TaskCounter, Type: TaskRetrieval, SKU: "SKU-001",
 			StationNodeID: station, PositionNodeID: pid,
 			AssignedBotID: -1, CreatedAtStep: s.Step, CompletedAtStep: -1,
+			Conveyable: pInfo.Conveyable,
 		}
+		if isCasepickRetrieval {
+			casesToPick := cfg.CasesPerPick
+			if casesToPick > pInfo.CasesRemaining {
+				casesToPick = pInfo.CasesRemaining
+			}
+			task.CasesPickedThisTrip = casesToPick
+			task.IsPartialReturn = (pInfo.CasesRemaining - casesToPick) > 0
+		}
+		return task
 	}
 	return nil
 }
@@ -396,6 +520,23 @@ func edgeTravelTicks(raw *RawGraph, nodeIndex map[string]*RawNode, fromID, toID 
 
 // ─── Simulation step ───
 
+// opHandleTime returns the operator handle duration for a task at a station.
+// Accounts for conveyable vs non-conveyable pallets and casepick mode.
+func opHandleTime(task *Task, cfg SimConfig) int {
+	if cfg.Mode == "casepick" && task.Type == TaskRetrieval && task.CasesPickedThisTrip > 0 {
+		if task.Conveyable {
+			return task.CasesPickedThisTrip * cfg.PickTimePerCaseS
+		}
+		// Non-conveyable casepick: slower per-case pick + bin/repalletize overhead
+		return task.CasesPickedThisTrip*cfg.PickTimePerCaseNCS + cfg.BinRepalletizeTimeS
+	}
+	// Full pallet mode: conveyable vs non-conveyable handle time
+	if task.Conveyable {
+		return cfg.OpHandleConveyableS
+	}
+	return cfg.OpHandleNonConveyS
+}
+
 // getBotTarget returns the navigation target for a bot, or "" if stationary.
 func getBotTarget(b *Bot) string {
 	if b.Task == nil {
@@ -408,6 +549,9 @@ func getBotTarget(b *Bot) string {
 		}
 		return b.Task.PositionNodeID
 	case BotTravelingToDropoff, BotEdgeWaitDrop:
+		if b.WaitingPhase == "return" {
+			return b.Task.PositionNodeID // returning pallet to storage
+		}
 		if b.Task.Type == TaskInduction {
 			return b.Task.PositionNodeID
 		}
@@ -437,33 +581,67 @@ func stepSimulation(s *SimState, cfg SimConfig) {
 		}
 	}
 
-	// Generate up to (idleBots - unassigned + buffer) tasks per step
+	// Generate up to (idleBots - unassigned + buffer) tasks per step.
+	// In casepick mode, only inductions count toward ShiftPalletCount;
+	// retrieval tasks are generated as long as pallets have cases.
 	needed := idleBots - unassigned + 3
-	for i := 0; i < needed && s.ShiftTasksGenerated < cfg.ShiftPalletCount; i++ {
+	for i := 0; i < needed; i++ {
+		if cfg.Mode != "casepick" && cfg.Mode != "mixed" && s.ShiftTasksGenerated >= cfg.ShiftPalletCount {
+			break
+		}
 		t := s.generateTask(cfg)
 		if t != nil {
 			s.Tasks = append(s.Tasks, t)
-			s.ShiftTasksGenerated++
+			if t.Type == TaskInduction {
+				s.ShiftTasksGenerated++
+			} else if cfg.Mode != "casepick" && cfg.Mode != "mixed" {
+				s.ShiftTasksGenerated++
+			}
 		} else {
 			break // can't generate more
 		}
 	}
 
-	// Shift done when all generated tasks are completed
-	if s.ShiftTasksGenerated >= cfg.ShiftPalletCount && len(s.Tasks) == 0 {
-		s.ShiftDone = true
-		return
+	// Shift completion check.
+	if cfg.Mode == "casepick" || cfg.Mode == "mixed" {
+		// PICO/mixed: done when all pallets inducted, all depleted, and no active tasks.
+		if s.ShiftTasksGenerated >= cfg.ShiftPalletCount && len(s.Tasks) == 0 {
+			allDepleted := true
+			for _, info := range s.Pallets {
+				if info != nil && info.CasesRemaining > 0 {
+					allDepleted = false
+					break
+				}
+			}
+			if allDepleted {
+				s.ShiftDone = true
+				return
+			}
+			// Still pallets to pick — try generating more retrieval tasks.
+			t := s.generateTask(cfg)
+			if t != nil {
+				s.Tasks = append(s.Tasks, t)
+			} else if allDepleted {
+				s.ShiftDone = true
+				return
+			}
+		}
+	} else {
+		// PIPO: done when all generated tasks are completed.
+		if s.ShiftTasksGenerated >= cfg.ShiftPalletCount && len(s.Tasks) == 0 {
+			s.ShiftDone = true
+			return
+		}
 	}
-	// Also done if all active tasks are complete and we can't generate more
-	// (e.g. retrieval impossible because no pallets left)
+	// Also done if all active tasks complete and we can't generate more.
 	if len(s.Tasks) == 0 && len(s.CompletedTasks) > 0 {
-		// Try one more generation attempt
 		t := s.generateTask(cfg)
 		if t != nil {
 			s.Tasks = append(s.Tasks, t)
-			s.ShiftTasksGenerated++
+			if cfg.Mode != "casepick" && cfg.Mode != "mixed" {
+				s.ShiftTasksGenerated++
+			}
 		} else {
-			// Can't generate, all current tasks done — end shift
 			s.ShiftDone = true
 			return
 		}
@@ -483,18 +661,41 @@ func stepSimulation(s *SimState, cfg SimConfig) {
 			if b.EdgeWaitTicks <= 0 {
 				if b.PathIndex >= len(b.Path)-1 {
 					if b.State == BotEdgeWait {
-						b.State = BotPicking
-						if b.Task.Type == TaskInduction {
-							b.StepsRemaining = cfg.StationPickTimeS
+						// Pickup leg complete. Station arrival for induction.
+						if s.Operators != nil && b.Task.Type == TaskInduction {
+							b.State = BotWaitingForOperator
+							b.WaitingPhase = "pickup"
+							s.Operators.EnqueueBot(b.Task.StationNodeID, b.ID, opHandleTime(b.Task, cfg), cfg)
 						} else {
-							b.StepsRemaining = cfg.PositionPickTimeS
+							b.State = BotPicking
+							if b.Task.Type == TaskInduction {
+								b.StepsRemaining = cfg.StationPickTimeS
+							} else {
+								b.StepsRemaining = cfg.PositionPickTimeS
+							}
 						}
 					} else {
-						b.State = BotPlacing
-						if b.Task.Type == TaskInduction {
+						// Dropoff leg complete.
+						if b.WaitingPhase == "return" {
+							// PICO return: bot placing pallet back at position.
+							b.State = BotPlacing
 							b.StepsRemaining = cfg.PositionDropTimeS
+						} else if s.Operators != nil && b.Task.Type == TaskRetrieval {
+							// Station arrival for retrieval.
+							b.State = BotWaitingForOperator
+							b.WaitingPhase = "dropoff"
+							s.Operators.EnqueueBot(b.Task.StationNodeID, b.ID, opHandleTime(b.Task, cfg), cfg)
 						} else {
-							b.StepsRemaining = cfg.StationDropTimeS
+							b.State = BotPlacing
+							if b.Task.Type == TaskInduction {
+								b.StepsRemaining = cfg.PositionDropTimeS
+							} else {
+								if cfg.Mode == "casepick" && b.Task.Type == TaskRetrieval && b.Task.CasesPickedThisTrip > 0 {
+									b.StepsRemaining = b.Task.CasesPickedThisTrip * cfg.PickTimePerCaseS
+								} else {
+									b.StepsRemaining = cfg.StationDropTimeS
+								}
+							}
 						}
 					}
 				} else {
@@ -621,22 +822,45 @@ func stepSimulation(s *SimState, cfg SimConfig) {
 
 				if b.PathIndex >= len(b.Path)-1 {
 					if b.State == BotTravelingToPickup {
-						b.State = BotPicking
-						if b.Task.Type == TaskInduction {
-							b.StepsRemaining = cfg.StationPickTimeS
+						if s.Operators != nil && b.Task.Type == TaskInduction {
+							b.State = BotWaitingForOperator
+							b.WaitingPhase = "pickup"
+							s.Operators.EnqueueBot(b.Task.StationNodeID, b.ID, opHandleTime(b.Task, cfg), cfg)
 						} else {
-							b.StepsRemaining = cfg.PositionPickTimeS
+							b.State = BotPicking
+							if b.Task.Type == TaskInduction {
+								b.StepsRemaining = cfg.StationPickTimeS
+							} else {
+								b.StepsRemaining = cfg.PositionPickTimeS
+							}
 						}
 					} else {
-						b.State = BotPlacing
-						if b.Task.Type == TaskInduction {
+						if b.WaitingPhase == "return" {
+							// PICO return: bot placing pallet back at position.
+							b.State = BotPlacing
 							b.StepsRemaining = cfg.PositionDropTimeS
+						} else if s.Operators != nil && b.Task.Type == TaskRetrieval {
+							b.State = BotWaitingForOperator
+							b.WaitingPhase = "dropoff"
+							s.Operators.EnqueueBot(b.Task.StationNodeID, b.ID, opHandleTime(b.Task, cfg), cfg)
 						} else {
-							b.StepsRemaining = cfg.StationDropTimeS
+							b.State = BotPlacing
+							if b.Task.Type == TaskInduction {
+								b.StepsRemaining = cfg.PositionDropTimeS
+							} else {
+								if cfg.Mode == "casepick" && b.Task.Type == TaskRetrieval && b.Task.CasesPickedThisTrip > 0 {
+									b.StepsRemaining = b.Task.CasesPickedThisTrip * cfg.PickTimePerCaseS
+								} else {
+									b.StepsRemaining = cfg.StationDropTimeS
+								}
+							}
 						}
 					}
 				}
 			}
+		case BotWaitingForOperator:
+			b.TotalBusySteps++ // waiting counts as busy (bot is occupied)
+
 		case BotPicking:
 			b.TotalBusySteps++
 			b.StepsRemaining--
@@ -662,24 +886,153 @@ func stepSimulation(s *SimState, cfg SimConfig) {
 			b.TotalBusySteps++
 			b.StepsRemaining--
 			if b.StepsRemaining <= 0 && b.Task != nil {
-				if b.Task.Type == TaskInduction {
-					s.Pallets[b.Task.PositionNodeID] = true
-				} else {
-					delete(s.Pallets, b.Task.PositionNodeID)
-				}
-				b.Task.CompletedAtStep = s.Step
-				s.CompletedTasks = append(s.CompletedTasks, b.Task)
-				// Remove from active
-				for i, t := range s.Tasks {
-					if t.ID == b.Task.ID {
-						s.Tasks = append(s.Tasks[:i], s.Tasks[i+1:]...)
-						break
+				if b.WaitingPhase == "return" {
+					// PICO partial return: pallet placed back at position.
+					// CasesRemaining already decremented in operator completion.
+					b.Task.CompletedAtStep = s.Step
+					s.CompletedTasks = append(s.CompletedTasks, b.Task)
+					for i, t := range s.Tasks {
+						if t.ID == b.Task.ID {
+							s.Tasks = append(s.Tasks[:i], s.Tasks[i+1:]...)
+							break
+						}
 					}
+					s.StationTasks[b.Task.StationNodeID]++
+					b.TasksCompleted++
+					b.State = BotIdle
+					b.Task = nil
+					b.WaitingPhase = ""
+				} else if b.Task.Type == TaskInduction {
+					palletCases := 1
+					if cfg.Mode == "casepick" {
+						palletCases = cfg.CasesPerPallet
+					}
+					s.Pallets[b.Task.PositionNodeID] = &PalletInfo{CasesRemaining: palletCases, Conveyable: b.Task.Conveyable}
+					b.Task.CompletedAtStep = s.Step
+					s.CompletedTasks = append(s.CompletedTasks, b.Task)
+					for i, t := range s.Tasks {
+						if t.ID == b.Task.ID {
+							s.Tasks = append(s.Tasks[:i], s.Tasks[i+1:]...)
+							break
+						}
+					}
+					s.StationTasks[b.Task.StationNodeID]++
+					b.TasksCompleted++
+					b.State = BotIdle
+					b.Task = nil
+				} else {
+					// PIPO retrieval at station (non-operator path) or other.
+					delete(s.Pallets, b.Task.PositionNodeID)
+					b.Task.CompletedAtStep = s.Step
+					s.CompletedTasks = append(s.CompletedTasks, b.Task)
+					for i, t := range s.Tasks {
+						if t.ID == b.Task.ID {
+							s.Tasks = append(s.Tasks[:i], s.Tasks[i+1:]...)
+							break
+						}
+					}
+					s.StationTasks[b.Task.StationNodeID]++
+					b.TasksCompleted++
+					b.State = BotIdle
+					b.Task = nil
 				}
-				s.StationTasks[b.Task.StationNodeID]++
-				b.TasksCompleted++
-				b.State = BotIdle
-				b.Task = nil
+			}
+		}
+	}
+
+	// Advance operators and handle completed service.
+	if s.Operators != nil {
+		completedBots := s.Operators.stepOperators(s.Bots, cfg)
+		for botID := range completedBots {
+			b := s.Bots[botID]
+			if b.Task == nil {
+				continue
+			}
+			if b.WaitingPhase == "pickup" {
+				// Pickup at station done — route to dropoff (pallet position).
+				var target string
+				if b.Task.Type == TaskInduction {
+					target = b.Task.PositionNodeID
+				} else {
+					target = b.Task.StationNodeID
+				}
+				result := Dijkstra(s.graph, b.CurrentNodeID, target)
+				if result != nil {
+					b.Path = result.Path
+					b.PathIndex = 0
+					b.State = BotTravelingToDropoff
+				} else {
+					b.State = BotIdle
+					b.Task = nil
+				}
+			} else {
+				// Dropoff at station done.
+				if cfg.Mode == "casepick" && b.Task.Type == TaskRetrieval && b.Task.IsPartialReturn {
+					// PICO partial return: deduct cases, route bot back to storage.
+					pInfo := s.Pallets[b.Task.PositionNodeID]
+					if pInfo != nil {
+						pInfo.CasesRemaining -= b.Task.CasesPickedThisTrip
+						if pInfo.CasesRemaining < 0 {
+							pInfo.CasesRemaining = 0
+						}
+					}
+					result := Dijkstra(s.graph, b.CurrentNodeID, b.Task.PositionNodeID)
+					if result != nil {
+						b.Path = result.Path
+						b.PathIndex = 0
+						b.State = BotTravelingToDropoff
+						b.WaitingPhase = "return"
+					} else {
+						// Can't route back — complete task anyway.
+						b.Task.CompletedAtStep = s.Step
+						s.CompletedTasks = append(s.CompletedTasks, b.Task)
+						for i, t := range s.Tasks {
+							if t.ID == b.Task.ID {
+								s.Tasks = append(s.Tasks[:i], s.Tasks[i+1:]...)
+								break
+							}
+						}
+						s.StationTasks[b.Task.StationNodeID]++
+						b.TasksCompleted++
+						b.State = BotIdle
+						b.Task = nil
+						b.WaitingPhase = ""
+					}
+				} else {
+					// PIPO or final PICO pick: task complete.
+					if b.Task.Type == TaskInduction {
+						palletCases := 1
+						if cfg.Mode == "casepick" {
+							palletCases = cfg.CasesPerPallet
+						}
+						s.Pallets[b.Task.PositionNodeID] = &PalletInfo{CasesRemaining: palletCases, Conveyable: b.Task.Conveyable}
+					} else {
+						if cfg.Mode == "casepick" {
+							// Final pick: deduct remaining cases, then remove pallet.
+							pInfo := s.Pallets[b.Task.PositionNodeID]
+							if pInfo != nil {
+								pInfo.CasesRemaining -= b.Task.CasesPickedThisTrip
+							}
+						}
+						delete(s.Pallets, b.Task.PositionNodeID)
+					}
+					b.Task.CompletedAtStep = s.Step
+					s.CompletedTasks = append(s.CompletedTasks, b.Task)
+					for i, t := range s.Tasks {
+						if t.ID == b.Task.ID {
+							s.Tasks = append(s.Tasks[:i], s.Tasks[i+1:]...)
+							break
+						}
+					}
+					s.StationTasks[b.Task.StationNodeID]++
+					b.TasksCompleted++
+					b.State = BotIdle
+					b.Task = nil
+					b.WaitingPhase = ""
+				}
+			}
+			if b.WaitingPhase != "return" {
+				b.WaitingPhase = ""
 			}
 		}
 	}
@@ -707,6 +1060,9 @@ func stepSimulation(s *SimState, cfg SimConfig) {
 			if b.Task.Type == TaskInduction {
 				stationQueue[stn]++ // heading to station
 			}
+		case BotWaitingForOperator:
+			s.StationBusyTicks[stn]++
+			stationQueue[stn]++
 		case BotTravelingToDropoff, BotEdgeWaitDrop:
 			if b.Task.Type == TaskRetrieval {
 				stationQueue[stn]++ // heading to station
@@ -748,9 +1104,10 @@ func stepSimulation(s *SimState, cfg SimConfig) {
 // ─── Work items ───
 
 type WorkItem struct {
-	BotCount   int
-	Algorithm  string
-	ShiftIndex int
+	BotCount            int
+	OperatorsPerStation int
+	Algorithm           string
+	ShiftIndex          int
 }
 
 type StationMetrics struct {
@@ -774,6 +1131,11 @@ type WorkResult struct {
 	CompletedTasks    int
 	Steps             int
 	Stations          []StationMetrics
+	OpStats           *OperatorMetrics `json:"operatorStats,omitempty"`
+	// Casepick metrics.
+	TotalCasesPicked    int     `json:"totalCasesPicked,omitempty"`
+	TotalRetrievalTrips int     `json:"totalRetrievalTrips,omitempty"`
+	AvgTripsPerPallet   float64 `json:"avgTripsPerPallet,omitempty"`
 }
 
 func runShift(raw *RawGraph, costs CostParams, item WorkItem, palletCount int) WorkResult {
@@ -781,11 +1143,16 @@ func runShift(raw *RawGraph, costs CostParams, item WorkItem, palletCount int) W
 	cfg := defaultSimConfig
 	cfg.BotCount = item.BotCount
 	cfg.Algorithm = item.Algorithm
+	cfg.OperatorsPerStation = item.OperatorsPerStation
 	cfg.ShiftPalletCount = palletCount
 
 	seed := int64(item.BotCount*1000 + item.ShiftIndex)
 	state := newSimState(raw, g, cfg, seed)
-	maxSteps := palletCount * 1000 // generous limit
+	tripsMultiplier := 1
+	if (cfg.Mode == "casepick" || cfg.Mode == "mixed") && cfg.CasesPerPick > 0 {
+		tripsMultiplier = (cfg.CasesPerPallet + cfg.CasesPerPick - 1) / cfg.CasesPerPick
+	}
+	maxSteps := palletCount * tripsMultiplier * 2000 // generous limit
 
 	for !state.ShiftDone && state.Step < maxSteps {
 		stepSimulation(state, cfg)
@@ -860,15 +1227,40 @@ func runShift(raw *RawGraph, costs CostParams, item WorkItem, palletCount int) W
 		})
 	}
 
+	var opStats *OperatorMetrics
+	if state.Operators != nil {
+		m := state.Operators.computeMetrics(state.Step, cfg.OperatorsPerStation)
+		opStats = &m
+	}
+
+	// Casepick metrics.
+	var totalCasesPicked, totalRetrievalTrips int
+	var avgTripsPerPallet float64
+	if cfg.Mode == "casepick" {
+		for _, t := range state.CompletedTasks {
+			if t.Type == TaskRetrieval {
+				totalRetrievalTrips++
+				totalCasesPicked += t.CasesPickedThisTrip
+			}
+		}
+		if cfg.ShiftPalletCount > 0 {
+			avgTripsPerPallet = float64(totalRetrievalTrips) / float64(cfg.ShiftPalletCount)
+		}
+	}
+
 	return WorkResult{
-		WorkItem:          item,
-		AvgCycleTimeS:     avgCycle,
-		ThroughputPerHour: throughput,
-		AvgUtilization:    avgUtil,
-		CollisionWaitPct:  collPct,
-		CompletedTasks:    completed,
-		Steps:             state.Step,
-		Stations:          stMetrics,
+		WorkItem:            item,
+		AvgCycleTimeS:       avgCycle,
+		ThroughputPerHour:   throughput,
+		AvgUtilization:      avgUtil,
+		CollisionWaitPct:    collPct,
+		CompletedTasks:      completed,
+		Steps:               state.Step,
+		Stations:            stMetrics,
+		OpStats:             opStats,
+		TotalCasesPicked:    totalCasesPicked,
+		TotalRetrievalTrips: totalRetrievalTrips,
+		AvgTripsPerPallet:   avgTripsPerPallet,
 	}
 }
 
@@ -884,7 +1276,43 @@ func main() {
 	workers := flag.Int("workers", runtime.NumCPU(), "Max goroutines")
 	outPath := flag.String("out", "calibration-results.json", "Output JSON path")
 	csvPath := flag.String("csv", "", "Also output CSV")
+	opsPerStation := flag.Int("ops", 1, "Operators per station (0=flat delay without queueing)")
+	opsSweepStr := flag.String("ops-sweep", "", "Comma-separated operator counts to sweep (e.g., 0,1,2,3)")
+	opIdentify := flag.Int("op-identify", 5, "Operator identify time (seconds)")
+	opHandle := flag.Int("op-handle", 3, "Operator handle time (seconds)")
+	opConfirm := flag.Int("op-confirm", 3, "Operator confirm time (seconds)")
+	mode := flag.String("mode", "pallet", "Simulation mode: pallet, casepick, or mixed")
+	southOnly := flag.Bool("south-only", false, "Focus on south side stations only (OB)")
+	casepickStations := flag.String("casepick-stations", "op-16-46", "Comma-separated station IDs for casepick (mixed mode)")
+	casesPerPallet := flag.Int("cases-per-pallet", 24, "Cases per pallet (casepick mode)")
+	casesPerPick := flag.Int("cases-per-pick", 4, "Cases picked per station visit (casepick mode)")
+	pickTimePerCase := flag.Int("pick-time-per-case", 3, "Seconds per case during operator handling (casepick mode)")
+	conveyablePct := flag.Int("conveyable-pct", 60, "Percentage of pallets that are conveyable (0-100)")
+	opHandleConv := flag.Int("op-handle-conv", 3, "Operator handle time for conveyable pallets (s)")
+	opHandleNonConv := flag.Int("op-handle-ncv", 8, "Operator handle time for non-conveyable pallets (s)")
+	pickTimeNCS := flag.Int("pick-time-ncv", 5, "Per-case pick time for non-conveyable (casepick, s)")
+	binRepalTime := flag.Int("bin-repal-time", 10, "Bin/repalletize overhead for non-conveyable casepick (s)")
+	schedulePath := flag.String("schedule", "", "CP-SAT schedule JSON for template replay mode")
+	schedWaves := flag.Int("sched-waves", 10, "Number of waves to replay per shift")
+	schedServiceMin := flag.Int("op-service-min", 40, "Min operator service time for stochastic replay (s)")
+	schedServiceMax := flag.Int("op-service-max", 52, "Max operator service time for stochastic replay (s)")
 	flag.Parse()
+
+	// Apply operator timing to defaults.
+	defaultSimConfig.OpIdentifyTimeS = *opIdentify
+	defaultSimConfig.OpHandleTimeS = *opHandle
+	defaultSimConfig.OpConfirmTimeS = *opConfirm
+	defaultSimConfig.Mode = *mode
+	defaultSimConfig.SouthOnly = *southOnly
+	defaultSimConfig.CasepickStations = *casepickStations
+	defaultSimConfig.CasesPerPallet = *casesPerPallet
+	defaultSimConfig.CasesPerPick = *casesPerPick
+	defaultSimConfig.PickTimePerCaseS = *pickTimePerCase
+	defaultSimConfig.ConveyablePct = *conveyablePct
+	defaultSimConfig.OpHandleConveyableS = *opHandleConv
+	defaultSimConfig.OpHandleNonConveyS = *opHandleNonConv
+	defaultSimConfig.PickTimePerCaseNCS = *pickTimeNCS
+	defaultSimConfig.BinRepalletizeTimeS = *binRepalTime
 
 	if *debugMode {
 		runDiagnostic(*mapPath)
@@ -892,6 +1320,10 @@ func main() {
 	}
 	if *zoneMode {
 		runZoneAnalysis(*mapPath, *pallets, *shifts)
+		return
+	}
+	if *schedulePath != "" {
+		runScheduleMode(*schedulePath, *mapPath, *schedWaves, *shifts, *schedServiceMin, *schedServiceMax)
 		return
 	}
 
@@ -905,10 +1337,28 @@ func main() {
 		}
 	}
 
+	// Build operator counts to sweep.
+	var operatorCounts []int
+	if *opsSweepStr != "" {
+		for _, s := range strings.Split(*opsSweepStr, ",") {
+			n, _ := strconv.Atoi(strings.TrimSpace(s))
+			if n >= 0 {
+				operatorCounts = append(operatorCounts, n)
+			}
+		}
+	} else {
+		operatorCounts = []int{*opsPerStation}
+	}
+
 	fmt.Println("=== EVT Congestion Calibration (Go, CA*) ===")
 	fmt.Printf("Map:        %s\n", *mapPath)
+	fmt.Printf("Mode:       %s\n", *mode)
+	if *mode == "casepick" {
+		fmt.Printf("Cases:      %d/pallet, %d/pick, %ds/case\n", *casesPerPallet, *casesPerPick, *pickTimePerCase)
+	}
 	fmt.Printf("Bot counts: %v\n", botCounts)
-	fmt.Printf("Shifts:     %d per (botCount, algorithm)\n", *shifts)
+	fmt.Printf("Operators:  %v per station\n", operatorCounts)
+	fmt.Printf("Shifts:     %d per (botCount, ops, algorithm)\n", *shifts)
 	fmt.Printf("Pallets:    %d per shift\n", *pallets)
 	fmt.Printf("Workers:    %d goroutines (of %d cores)\n", *workers, runtime.NumCPU())
 	fmt.Println()
@@ -924,9 +1374,11 @@ func main() {
 	algorithms := []string{"no-collision", "ca-star"}
 	var items []WorkItem
 	for _, bc := range botCounts {
-		for _, algo := range algorithms {
-			for s := 0; s < *shifts; s++ {
-				items = append(items, WorkItem{BotCount: bc, Algorithm: algo, ShiftIndex: s})
+		for _, ops := range operatorCounts {
+			for _, algo := range algorithms {
+				for s := 0; s < *shifts; s++ {
+					items = append(items, WorkItem{BotCount: bc, OperatorsPerStation: ops, Algorithm: algo, ShiftIndex: s})
+				}
 			}
 		}
 	}
@@ -962,9 +1414,9 @@ func main() {
 			rate := float64(c) / elapsed
 			eta := float64(total-c) / rate
 			r := results[idx]
-			fmt.Printf("\r  [%d%%] %d/%d | %.1fs | %.1f/s | ETA %.0fs | %d bots %s s%d → %d tasks in %d steps   ",
+			fmt.Printf("\r  [%d%%] %d/%d | %.1fs | %.1f/s | ETA %.0fs | %d bots %dops %s s%d → %d tasks in %d steps   ",
 				c*100/total, c, total, elapsed, rate, eta,
-				it.BotCount, it.Algorithm, it.ShiftIndex, r.CompletedTasks, r.Steps)
+				it.BotCount, it.OperatorsPerStation, it.Algorithm, it.ShiftIndex, r.CompletedTasks, r.Steps)
 		}(i, item)
 	}
 	wg.Wait()
@@ -973,17 +1425,22 @@ func main() {
 	// Aggregate
 	aggMap := make(map[string][]WorkResult)
 	for _, r := range results {
-		key := fmt.Sprintf("%d:%s", r.BotCount, r.Algorithm)
+		key := fmt.Sprintf("%d:%d:%s", r.BotCount, r.OperatorsPerStation, r.Algorithm)
 		aggMap[key] = append(aggMap[key], r)
 	}
 
 	type AggResult struct {
-		AvgCycleTimeS     float64 `json:"avgCycleTimeS"`
-		ThroughputPerHour float64 `json:"throughputPerHour"`
-		AvgUtilization    float64 `json:"avgUtilization"`
-		CollisionWaitPct  float64 `json:"avgCollisionWaitPct"`
-		TotalTasks        int     `json:"totalTasks"`
-		ShiftsRun         int     `json:"shiftsRun"`
+		AvgCycleTimeS     float64          `json:"avgCycleTimeS"`
+		ThroughputPerHour float64          `json:"throughputPerHour"`
+		AvgUtilization    float64          `json:"avgUtilization"`
+		CollisionWaitPct  float64          `json:"avgCollisionWaitPct"`
+		TotalTasks        int              `json:"totalTasks"`
+		ShiftsRun         int              `json:"shiftsRun"`
+		OpStats           *OperatorMetrics `json:"operatorStats,omitempty"`
+		// Casepick metrics.
+		TotalCasesPicked    int     `json:"totalCasesPicked,omitempty"`
+		TotalRetrievalTrips int     `json:"totalRetrievalTrips,omitempty"`
+		AvgTripsPerPallet   float64 `json:"avgTripsPerPallet,omitempty"`
 	}
 
 	agg := func(rs []WorkResult) AggResult {
@@ -992,18 +1449,44 @@ func main() {
 			return AggResult{}
 		}
 		var a AggResult
+		var opUtilSum, opQueueSum, opWaitSum float64
+		opMaxQ := 0
+		hasOps := false
 		for _, r := range rs {
 			a.AvgCycleTimeS += r.AvgCycleTimeS
 			a.ThroughputPerHour += r.ThroughputPerHour
 			a.AvgUtilization += r.AvgUtilization
 			a.CollisionWaitPct += r.CollisionWaitPct
 			a.TotalTasks += r.CompletedTasks
+			a.TotalCasesPicked += r.TotalCasesPicked
+			a.TotalRetrievalTrips += r.TotalRetrievalTrips
+			a.AvgTripsPerPallet += r.AvgTripsPerPallet
+			if r.OpStats != nil {
+				hasOps = true
+				opUtilSum += r.OpStats.AvgUtilPct
+				opQueueSum += r.OpStats.AvgQueueDepth
+				opWaitSum += r.OpStats.AvgWaitTicks
+				if r.OpStats.MaxQueueDepth > opMaxQ {
+					opMaxQ = r.OpStats.MaxQueueDepth
+				}
+			}
 		}
 		a.AvgCycleTimeS /= float64(n)
 		a.ThroughputPerHour /= float64(n)
 		a.AvgUtilization /= float64(n)
 		a.CollisionWaitPct /= float64(n)
 		a.ShiftsRun = n
+		a.AvgTripsPerPallet /= float64(n)
+		if hasOps {
+			a.OpStats = &OperatorMetrics{
+				OperatorsPerStation: rs[0].OpStats.OperatorsPerStation,
+				TotalOperators:      rs[0].OpStats.TotalOperators,
+				AvgUtilPct:          opUtilSum / float64(n),
+				AvgQueueDepth:       opQueueSum / float64(n),
+				MaxQueueDepth:       opMaxQ,
+				AvgWaitTicks:        opWaitSum / float64(n),
+			}
+		}
 		return a
 	}
 
@@ -1020,18 +1503,20 @@ func main() {
 	}
 
 	type Sample struct {
-		BotCount          int             `json:"botCount"`
-		NoCollision       AggResult       `json:"noCollision"`
-		CAStar            AggResult       `json:"cooperativeAStar"`
-		CycleTimePenalty  float64         `json:"cycleTimePenalty"`
-		ThroughputPenalty float64         `json:"throughputPenalty"`
-		StationCongestion []SampleStation `json:"stationCongestion,omitempty"`
+		BotCount            int             `json:"botCount"`
+		OperatorsPerStation int             `json:"operatorsPerStation"`
+		NoCollision         AggResult       `json:"noCollision"`
+		CAStar              AggResult       `json:"cooperativeAStar"`
+		CycleTimePenalty    float64         `json:"cycleTimePenalty"`
+		ThroughputPenalty   float64         `json:"throughputPenalty"`
+		StationCongestion   []SampleStation `json:"stationCongestion,omitempty"`
 	}
 
 	var samples []Sample
 	for _, bc := range botCounts {
-		nc := agg(aggMap[fmt.Sprintf("%d:no-collision", bc)])
-		ca := agg(aggMap[fmt.Sprintf("%d:%s", bc, algorithms[1])])
+		for _, ops := range operatorCounts {
+		nc := agg(aggMap[fmt.Sprintf("%d:%d:no-collision", bc, ops)])
+		ca := agg(aggMap[fmt.Sprintf("%d:%d:%s", bc, ops, algorithms[1])])
 		cycPen := 1.0
 		if nc.AvgCycleTimeS > 0 {
 			cycPen = ca.AvgCycleTimeS / nc.AvgCycleTimeS
@@ -1042,7 +1527,7 @@ func main() {
 		}
 		// Aggregate station metrics for this bot count
 		var sampleStns []SampleStation
-		caResults := aggMap[fmt.Sprintf("%d:ca-star", bc)]
+		caResults := aggMap[fmt.Sprintf("%d:%d:ca-star", bc, ops)]
 		if len(caResults) > 0 && len(caResults[0].Stations) > 0 {
 			nShifts := float64(len(caResults))
 			for _, sm := range caResults[0].Stations {
@@ -1073,28 +1558,38 @@ func main() {
 		}
 
 		samples = append(samples, Sample{
-			BotCount: bc, NoCollision: nc, CAStar: ca,
+			BotCount: bc, OperatorsPerStation: ops, NoCollision: nc, CAStar: ca,
 			CycleTimePenalty: cycPen, ThroughputPenalty: thrPen,
 			StationCongestion: sampleStns,
 		})
+		} // end operator loop
 	}
 
 	// Print table
-	fmt.Println("┌────────┬──────────────────────────────┬──────────────────────────────┬──────────────────┐")
-	fmt.Println("│  Bots  │   No-Collision (free-flow)    │   CA* (strict blocking)       │    Penalties     │")
-	fmt.Println("│        │  Cyc(s) Thr/hr Util%  Coll%   │  Cyc(s) Thr/hr Util%  Coll%   │  Cyc×    Thr×    │")
-	fmt.Println("├────────┼──────────────────────────────┼──────────────────────────────┼──────────────────┤")
+	hasOps := len(operatorCounts) > 1 || operatorCounts[0] > 0
+	fmt.Println("┌────────┬─────┬──────────────────────────────┬──────────────────────────────┬──────────────────┐")
+	fmt.Println("│  Bots  │ Ops │   No-Collision (free-flow)    │   CA* (strict blocking)       │    Penalties     │")
+	if hasOps {
+		fmt.Println("│        │     │  Cyc(s) Thr/hr Util%  Coll%   │  Cyc(s) Thr/hr Util% OpUtil%  │  Cyc×    Thr×    │")
+	} else {
+		fmt.Println("│        │     │  Cyc(s) Thr/hr Util%  Coll%   │  Cyc(s) Thr/hr Util%  Coll%   │  Cyc×    Thr×    │")
+	}
+	fmt.Println("├────────┼─────┼──────────────────────────────┼──────────────────────────────┼──────────────────┤")
 	for _, s := range samples {
 		nc := s.NoCollision
 		ca := s.CAStar
-		fmt.Printf("│ %4d   │ %5.0f  %6.1f  %4.0f%%  %4.1f%%  │ %5.0f  %6.1f  %4.0f%%  %4.1f%%  │ %6.3f %6.3f  │\n",
-			s.BotCount,
+		opUtilStr := fmt.Sprintf("%4.1f%%", ca.CollisionWaitPct*100)
+		if hasOps && ca.OpStats != nil {
+			opUtilStr = fmt.Sprintf("%4.0f%%", ca.OpStats.AvgUtilPct)
+		}
+		fmt.Printf("│ %4d   │ %3d │ %5.0f  %6.1f  %4.0f%%  %4.1f%%  │ %5.0f  %6.1f  %4.0f%%  %s  │ %6.3f %6.3f  │\n",
+			s.BotCount, s.OperatorsPerStation,
 			nc.AvgCycleTimeS, nc.ThroughputPerHour, nc.AvgUtilization*100, nc.CollisionWaitPct*100,
-			ca.AvgCycleTimeS, ca.ThroughputPerHour, ca.AvgUtilization*100, ca.CollisionWaitPct*100,
+			ca.AvgCycleTimeS, ca.ThroughputPerHour, ca.AvgUtilization*100, opUtilStr,
 			s.CycleTimePenalty, s.ThroughputPenalty,
 		)
 	}
-	fmt.Println("└────────┴──────────────────────────────┴──────────────────────────────┴──────────────────┘")
+	fmt.Println("└────────┴─────┴──────────────────────────────┴──────────────────────────────┴──────────────────┘")
 	fmt.Println()
 
 	// Station congestion analysis (CA* results only)
@@ -1103,7 +1598,8 @@ func main() {
 	fmt.Println("│  Bots  │  Station:  avg-util%  avg-queue  max-queue  tasks                                │")
 	fmt.Println("├────────┼────────────────────────────────────────────────────────────────────────────────────┤")
 	for _, bc := range botCounts {
-		caResults := aggMap[fmt.Sprintf("%d:ca-star", bc)]
+		for _, ops := range operatorCounts {
+		caResults := aggMap[fmt.Sprintf("%d:%d:ca-star", bc, ops)]
 		if len(caResults) == 0 {
 			continue
 		}
@@ -1148,7 +1644,12 @@ func main() {
 			short := strings.TrimPrefix(stn, "op-")
 			line += fmt.Sprintf("%s:%3.0f%%/%.1fq/%dmax/%dt", short, a.util/n, a.queue/n, a.maxQ, a.tasks)
 		}
-		fmt.Printf("│ %4d   │  %-86s│\n", bc, line)
+		opsLabel := ""
+		if len(operatorCounts) > 1 || operatorCounts[0] > 0 {
+			opsLabel = fmt.Sprintf(" ops=%d", ops)
+		}
+		fmt.Printf("│ %4d%-4s│  %-86s│\n", bc, opsLabel, line)
+		} // end operator loop
 	}
 	fmt.Println("└────────┴────────────────────────────────────────────────────────────────────────────────────┘")
 	fmt.Println()
@@ -1179,13 +1680,21 @@ func main() {
 
 	if *csvPath != "" {
 		var lines []string
-		lines = append(lines, "bot_count,nc_cycle_s,nc_thr_hr,nc_util,nc_coll_pct,nc_tasks,ca_cycle_s,ca_thr_hr,ca_util,ca_coll_pct,ca_tasks,cycle_penalty,thr_penalty")
+		lines = append(lines, "bot_count,ops_per_station,nc_cycle_s,nc_thr_hr,nc_util,nc_coll_pct,nc_tasks,ca_cycle_s,ca_thr_hr,ca_util,ca_coll_pct,ca_tasks,cycle_penalty,thr_penalty,op_util_pct,op_avg_queue,op_max_queue,op_avg_wait")
 		for _, s := range samples {
-			lines = append(lines, fmt.Sprintf("%d,%.2f,%.2f,%.4f,%.4f,%d,%.2f,%.2f,%.4f,%.4f,%d,%.4f,%.4f",
-				s.BotCount,
+			opUtil, opAvgQ, opMaxQ, opAvgW := 0.0, 0.0, 0, 0.0
+			if s.CAStar.OpStats != nil {
+				opUtil = s.CAStar.OpStats.AvgUtilPct
+				opAvgQ = s.CAStar.OpStats.AvgQueueDepth
+				opMaxQ = s.CAStar.OpStats.MaxQueueDepth
+				opAvgW = s.CAStar.OpStats.AvgWaitTicks
+			}
+			lines = append(lines, fmt.Sprintf("%d,%d,%.2f,%.2f,%.4f,%.4f,%d,%.2f,%.2f,%.4f,%.4f,%d,%.4f,%.4f,%.2f,%.2f,%d,%.2f",
+				s.BotCount, s.OperatorsPerStation,
 				s.NoCollision.AvgCycleTimeS, s.NoCollision.ThroughputPerHour, s.NoCollision.AvgUtilization, s.NoCollision.CollisionWaitPct, s.NoCollision.TotalTasks,
 				s.CAStar.AvgCycleTimeS, s.CAStar.ThroughputPerHour, s.CAStar.AvgUtilization, s.CAStar.CollisionWaitPct, s.CAStar.TotalTasks,
 				s.CycleTimePenalty, s.ThroughputPenalty,
+				opUtil, opAvgQ, opMaxQ, opAvgW,
 			))
 		}
 		os.WriteFile(*csvPath, []byte(strings.Join(lines, "\n")+"\n"), 0644)
