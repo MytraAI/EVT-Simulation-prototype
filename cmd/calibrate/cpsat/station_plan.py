@@ -42,6 +42,7 @@ class BotPlan:
     cells: list
     durations: list
     service_idx: int
+    cases_picked: int = 1  # number of cases this presentation picks
 
 
 # ── Service time model ──
@@ -71,14 +72,25 @@ class ServiceTimeModel:
         if self._presentation_dist is not None:
             return self._presentation_dist or None
         path = self._empirical_paths.get("presentation_dist")
-        if not path or not Path(path).exists():
+        if not path:
+            self._presentation_dist = {}
+            return None
+        # Resolve relative to repo root if not found at CWD
+        p = Path(path)
+        if not p.exists():
+            here = Path(__file__).resolve().parent
+            for anc in here.parents:
+                if (anc / ".git").exists():
+                    p = anc / path
+                    break
+        if not p.exists():
             self._presentation_dist = {}
             return None
         import duckdb
         db = duckdb.connect()
         rows = db.execute(
             f"SELECT sim_type, presentation_bucket, probability, p50_sot_s "
-            f"FROM read_parquet('{path}') ORDER BY sim_type, probability DESC"
+            f"FROM read_parquet('{p}') ORDER BY sim_type, probability DESC"
         ).fetchall()
         d: dict[str, list[tuple[str, float, float]]] = {}
         for st, bucket, prob, p50 in rows:
@@ -104,19 +116,29 @@ class ServiceTimeModel:
         logger.info("Loaded sequence table: %d pairs", len(self._sequence_table))
         return self._sequence_table or None
 
-    def _sample_presentation(self, pick_type: str, rng: random.Random) -> float:
-        """Sample a p50 from the presentation distribution for this type."""
+    # Midpoint case counts per bucket (used to compute picks/hr)
+    _BUCKET_CASES = {
+        "1_case": 1, "2-3_cases": 2, "4-6_cases": 5,
+        "7-12_cases": 9, "13+_cases": 20,
+    }
+
+    def _sample_presentation(self, pick_type: str, rng: random.Random) -> tuple[float, int]:
+        """Sample a (p50_sot, cases_picked) from the presentation distribution.
+
+        Returns (cycle_time_seconds, number_of_cases_this_pick).
+        """
         dist = self._load_presentation_dist()
         if dist and pick_type in dist:
             buckets = dist[pick_type]
             r = rng.random()
             acc = 0.0
-            for _, prob, p50 in buckets:
+            for bucket_name, prob, p50 in buckets:
                 acc += prob
                 if r <= acc:
-                    return p50
-            return buckets[-1][2]
-        return float(self.pick_times.get(pick_type, 50))
+                    cases = self._BUCKET_CASES.get(bucket_name, 1)
+                    return p50, cases
+            return buckets[-1][2], self._BUCKET_CASES.get(buckets[-1][0], 1)
+        return float(self.pick_times.get(pick_type, 50)), 1
 
     def _conv_class(self, pick_type: str) -> str:
         return "conv" if pick_type.endswith("_conv") else "ncv"
@@ -135,23 +157,32 @@ class ServiceTimeModel:
     IDENTIFY_S = 3
     CONFIRM_S = 2
 
+    def sample_service(self, pick_type: str, rng: random.Random,
+                       prev_type: str | None = None) -> tuple[int, int, int]:
+        """Sample a full service event. Returns (bot_dwell_s, operator_cycle_s, cases_picked).
+
+        bot_dwell = identify + handle + confirm  (bot stays at op cell)
+        operator_cycle = bot_dwell + 2 × walk    (operator busy including drop-off round trip)
+        cases_picked = how many cases this presentation picks
+        """
+        p50, cases = self._sample_presentation(pick_type, rng)
+        dwell = int(round(self.IDENTIFY_S + p50 + self.CONFIRM_S))
+        walk_dist = self.walk_distances.get(self._conv_class(pick_type), 2.0)
+        walk_s = walk_dist / self.walk_speed
+        op_cyc = int(round(self.IDENTIFY_S + p50 + self.CONFIRM_S + 2 * walk_s))
+        return dwell, op_cyc, cases
+
     def pick_time(self, pick_type: str, rng: random.Random,
                   prev_type: str | None = None) -> int:
         """Bot dwell at op cell = identify + handle + confirm."""
-        p50 = self._sample_presentation(pick_type, rng)
-        return int(round(self.IDENTIFY_S + p50 + self.CONFIRM_S))
+        dwell, _, _ = self.sample_service(pick_type, rng, prev_type)
+        return dwell
 
     def operator_cycle(self, pick_type: str, rng: random.Random,
                        prev_type: str | None = None) -> int:
-        """Operator busy time at one station (identify→handle→confirm→walk→back).
-
-        Does NOT include transit to next station — that's added separately
-        by the solver when consecutive services are at different stations.
-        """
-        p50 = self._sample_presentation(pick_type, rng)
-        walk_dist = self.walk_distances.get(self._conv_class(pick_type), 2.0)
-        walk_s = walk_dist / self.walk_speed
-        return int(round(self.IDENTIFY_S + p50 + self.CONFIRM_S + 2 * walk_s))
+        """Operator busy time (identify→confirm→walk round trip)."""
+        _, op_cyc, _ = self.sample_service(pick_type, rng, prev_type)
+        return op_cyc
 
     def walk_one_way_s(self, pick_type: str) -> int:
         """One-way walk to dropoff (seconds). Used for transit gap computation."""
@@ -238,8 +269,7 @@ def _build_baseline_plan(graph, stn: StationDef, entry: str, exit_pt: str,
     Without PEZ:
         entry → ... → xy → OP (pick) → xy → ... → exit
     """
-    dwell = svc.pick_time(pick_type, rng, prev_type)
-    op_cyc = svc.operator_cycle(pick_type, rng, prev_type)
+    dwell, op_cyc, cases = svc.sample_service(pick_type, rng, prev_type)
     approach = shortest_path(graph, entry, stn.xy)
     depart = shortest_path(graph, stn.xy, exit_pt)
 
@@ -268,7 +298,7 @@ def _build_baseline_plan(graph, stn: StationDef, entry: str, exit_pt: str,
             prev_axis = ed["axis"]
         else:
             durations.append(1)
-    return BotPlan(bot_id, stn.op, pick_type, dwell, op_cyc, cells, durations, service_idx)
+    return BotPlan(bot_id, stn.op, pick_type, dwell, op_cyc, cells, durations, service_idx, cases)
 
 
 def _build_leaf_plan(graph, stn: StationDef, entry: str, exit_pt: str,
@@ -282,8 +312,7 @@ def _build_leaf_plan(graph, stn: StationDef, entry: str, exit_pt: str,
     east-side stations). If PEZ IS present and reachable from the xy anchor,
     the tray-drop step is inserted after the pallet-chain return.
     """
-    dwell = svc.pick_time(pick_type, rng, prev_type)
-    op_cyc = svc.operator_cycle(pick_type, rng, prev_type)
+    dwell, op_cyc, cases = svc.sample_service(pick_type, rng, prev_type)
     chain = stn.pallet_chain or []
     approach = shortest_path(graph, entry, stn.xy)
     depart = shortest_path(graph, stn.xy, exit_pt)
@@ -315,7 +344,7 @@ def _build_leaf_plan(graph, stn: StationDef, entry: str, exit_pt: str,
             prev_axis = ed["axis"]
         else:
             durations.append(1)
-    return BotPlan(bot_id, stn.op, pick_type, dwell, op_cyc, cells, durations, service_idx)
+    return BotPlan(bot_id, stn.op, pick_type, dwell, op_cyc, cells, durations, service_idx, cases)
 
 
 def _build_direct_plan(graph, stn: StationDef, entry: str, exit_pt: str,
@@ -324,8 +353,7 @@ def _build_direct_plan(graph, stn: StationDef, entry: str, exit_pt: str,
                        svc: ServiceTimeModel, rng: random.Random,
                        prev_type: str | None = None) -> BotPlan:
     """Direct-access topology: op is on an aisle, no gateway."""
-    dwell = svc.pick_time(pick_type, rng, prev_type)
-    op_cyc = svc.operator_cycle(pick_type, rng, prev_type)
+    dwell, op_cyc, cases = svc.sample_service(pick_type, rng, prev_type)
     approach = shortest_path(graph, entry, stn.op)
     depart = shortest_path(graph, stn.op, exit_pt)
     cells = approach + depart[1:]
@@ -343,7 +371,7 @@ def _build_direct_plan(graph, stn: StationDef, entry: str, exit_pt: str,
             prev_axis = ed["axis"]
         else:
             durations.append(1)
-    return BotPlan(bot_id, stn.op, pick_type, dwell, op_cyc, cells, durations, service_idx)
+    return BotPlan(bot_id, stn.op, pick_type, dwell, op_cyc, cells, durations, service_idx, cases)
 
 
 _BUILDERS = {

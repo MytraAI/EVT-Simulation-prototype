@@ -61,8 +61,6 @@ service_time:
   pick_times:
     casepick_conv: 52
     casepick_ncv: 86
-    full_case_conv: 32
-    full_case_ncv: 116
   pez_dwell_s: 8
   pez_enabled: true
   empirical:

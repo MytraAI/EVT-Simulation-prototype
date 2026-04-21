@@ -61,6 +61,7 @@ def _worker_solve(task: tuple) -> dict:
     rng = random.Random(seed)
     bots = build_bots_from_config(_W_GRAPH, _W_GROUPS, n_bots,
                                    _W_KIN_UL, _W_KIN_LD, _W_SVC, rng)
+    total_cases = sum(b.cases_picked for b in bots)
     t0 = time.time()
     best = None
     for w in range(1, max_waves + 1):
@@ -72,16 +73,21 @@ def _worker_solve(task: tuple) -> dict:
             if best is not None:
                 break
             continue
-        pph = n_bots * 3600.0 / res["wave_offset_s"] if res["wave_offset_s"] else 0.0
-        res["pph"] = pph
+        presentations_ph = n_bots * 3600.0 / res["wave_offset_s"] if res["wave_offset_s"] else 0.0
+        picks_ph = total_cases * 3600.0 / res["wave_offset_s"] if res["wave_offset_s"] else 0.0
+        res["presentations_ph"] = presentations_ph
+        res["picks_ph"] = picks_ph
+        res["pph"] = picks_ph  # primary metric is now picks/hr
+        res["total_cases_per_wave"] = total_cases
         res["waves"] = w
-        if best is None or pph > best["pph"]:
+        if best is None or picks_ph > best["picks_ph"]:
             best = res
     dt = time.time() - t0
     if best is None:
-        best = {"pph": 0.0, "wave_offset_s": 0, "makespan_s": 0, "waves": 0,
+        best = {"pph": 0.0, "presentations_ph": 0.0, "picks_ph": 0.0,
+                "wave_offset_s": 0, "makespan_s": 0, "waves": 0,
                 "peak_queue_depth": 0, "avg_op_utilization": 0.0,
-                "status": "INFEASIBLE"}
+                "total_cases_per_wave": 0, "status": "INFEASIBLE"}
     return {"n_bots": n_bots, "ops": ops, "seed": seed, "res": best, "dt": dt}
 
 
