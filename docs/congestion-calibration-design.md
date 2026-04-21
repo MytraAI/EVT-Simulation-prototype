@@ -147,10 +147,11 @@ The throughput penalty shows clear diminishing returns as bot count increases:
 
 ### 5.1 Station Layout
 
-All 8 STATION_OP nodes are on the ground floor, arranged in two rows of 4:
+All 8 STATION_OP nodes are on the ground floor, arranged in two rows of 4.
+Axis convention: grid_y=0 is SOUTH (y_m ≈ 0.51m); grid_y=46 is NORTH (y_m ≈ 71.12m).
 
 ```
-   Front (y=0.5m):  op-4-0    op-8-0    op-12-0   op-16-0
+   South (y=0.5m):   op-4-0    op-8-0    op-12-0   op-16-0
                        │          │          │          │
    Gateways:        xy-3-0    xy-7-0    xy-11-0   xy-15-0
                        │          │          │          │
@@ -158,7 +159,7 @@ All 8 STATION_OP nodes are on the ground floor, arranged in two rows of 4:
                   ├──S1──┤  ├──S2──┤  ├──S3──┤  ├───S4───┤
                        shared:5    shared:9    shared:13
 
-   Back (y=71.1m):  op-4-46   op-8-46   op-12-46  op-16-46
+   North (y=71.1m):  op-4-46   op-8-46   op-12-46  op-16-46
 ```
 
 Each station connects to the aisle network through a dedicated **STATION_XY gateway** node. This gateway funnels ALL traffic to/from the station — a natural congestion chokepoint.

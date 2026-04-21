@@ -26,8 +26,32 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 STATION_SIM_DIR = Path(__file__).parent
-CPSAT_DIR = STATION_SIM_DIR.parent / "cmd" / "calibrate" / "cpsat"
-DEFAULT_MAP = "/home/pranav42/loom/grainger-pilot-04102026-graph.json"
+REPO_ROOT = STATION_SIM_DIR.parent
+CPSAT_DIR = REPO_ROOT / "cmd" / "calibrate" / "cpsat"
+# Baseline pilot graph (8-station Scp layout). Ep-Sc variant selectable via UI.
+DEFAULT_MAP = str(REPO_ROOT / "grainger-pilot-Scp.json")
+
+LAYOUT_MAPS = {
+    "Scp":   str(REPO_ROOT / "grainger-pilot-Scp.json"),
+    "Ep-Sc": str(REPO_ROOT / "grainger-pilot-Ep-Sc.json"),
+}
+
+
+def resolve_map(params: dict) -> str:
+    """Resolve the pilot graph path from params.
+
+    Preference order: explicit 'layout' name → 'map' path → DEFAULT_MAP.
+    A 'map' path that is relative is resolved against REPO_ROOT.
+    """
+    layout = params.get("layout")
+    if layout and layout in LAYOUT_MAPS:
+        return LAYOUT_MAPS[layout]
+    m = params.get("map")
+    if m:
+        p = Path(m)
+        # UI posts map paths relative to station-sim/ (where index.html lives).
+        return str(p if p.is_absolute() else (STATION_SIM_DIR / p).resolve())
+    return DEFAULT_MAP
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -38,7 +62,7 @@ def run_solver(params: dict, sweep: bool = False) -> dict:
     args = [
         sys.executable,
         str(CPSAT_DIR / "solver.py"),
-        "--map", params.get("map", DEFAULT_MAP),
+        "--map", resolve_map(params),
         "--service-time", str(params.get("serviceTime", 46)),
         "--time-buffer", str(params.get("timeBuffer", 2)),
         "--xy-speed", str(params.get("xySpeed", 1.5)),

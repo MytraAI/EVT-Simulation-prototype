@@ -1,0 +1,69 @@
+# Grainger West Slice — Single station block (2 stations)
+# Entry/exit from east side only. All pallet zones traversable (empty).
+
+graph_path: sample_west_slice.json
+
+slice:
+  method: grid_filter
+  filter:
+    level: 1
+    grid_y: {min: 38, max: 45}
+
+station_groups:
+  - label: west_block
+    stations:
+      - {op: "op--51-40", xy: "xy--51-41", pez: "pez--51-39"}
+      - {op: "op--51-42", xy: "xy--51-43", pez: "pez--51-44"}
+    # East boundary — bots enter/exit anywhere along the east edge
+    entry_points:
+      - "a-1--47-38"
+      - "a-1--47-39"
+      - "a-1--47-40"
+      - "a-1--47-41"
+      - "a-1--47-42"
+      - "a-1--47-43"
+      - "a-1--47-44"
+      - "a-1--47-45"
+      - "p-1-38--46-0"
+      - "p-1-39--46-0"
+      - "p-1-40--46-0"
+      - "p-1-41--46-0"
+      - "p-1-42--46-0"
+      - "p-1-43--46-0"
+      - "p-1-44--46-0"
+      - "p-1-45--46-0"
+    exit_points:
+      - "a-1--47-38"
+      - "a-1--47-39"
+      - "a-1--47-40"
+      - "a-1--47-41"
+      - "a-1--47-42"
+      - "a-1--47-43"
+      - "a-1--47-44"
+      - "a-1--47-45"
+      - "p-1-38--46-0"
+      - "p-1-39--46-0"
+      - "p-1-40--46-0"
+      - "p-1-41--46-0"
+      - "p-1-42--46-0"
+      - "p-1-43--46-0"
+      - "p-1-44--46-0"
+      - "p-1-45--46-0"
+    allow_same_entry_exit: true
+    pick_type_mix:
+      casepick_conv: 0.846
+      casepick_ncv: 0.154
+
+service_time:
+  overhead_s: 5
+  walk_speed_m_s: 1.67
+  walk_distances: {conv: 2.0, ncv: 3.5}
+  pick_times:
+    casepick_conv: 52
+    casepick_ncv: 86
+    full_case_conv: 32
+    full_case_ncv: 116
+  pez_dwell_s: 8
+  pez_enabled: true
+  empirical:
+    presentation_dist: output/empirical/presentation_distribution.parquet

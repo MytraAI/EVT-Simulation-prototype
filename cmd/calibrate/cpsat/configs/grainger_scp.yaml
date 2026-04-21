@@ -1,0 +1,38 @@
+# Grainger Pilot — Scp layout (4 south casepick stations)
+# Equivalent to: run_sweep.py --layout Scp
+
+graph_path: grainger-pilot-Scp.json
+
+slice:
+  method: grid_filter
+  filter:
+    level: 1
+    grid_y: {max: 12}
+
+station_groups:
+  - label: casepick
+    stations:
+      - {op: "op-4-0",  xy: "xy-3-0",  pez: "pez-2-0"}
+      - {op: "op-8-0",  xy: "xy-7-0",  pez: "pez-6-0"}
+      - {op: "op-12-0", xy: "xy-11-0", pez: "pez-10-0"}
+      - {op: "op-16-0", xy: "xy-15-0", pez: "pez-14-0"}
+    entry_points: ["a-1-3-12", "a-1-11-12", "a-1-17-12", "a-1-1-0", "a-1-19-0"]
+    exit_points:  ["a-1-7-12", "a-1-13-12", "a-1-1-0", "a-1-19-0"]
+    pick_type_mix:
+      casepick_conv: 0.846
+      casepick_ncv: 0.154
+
+service_time:
+  overhead_s: 5
+  walk_speed_m_s: 1.67
+  walk_distances:
+    conv: 2.0
+    ncv: 3.5
+  pick_times:
+    full_case_conv: 32
+    full_case_ncv: 116
+    casepick_conv: 52
+    casepick_ncv: 86
+  empirical:
+    presentation_dist: output/empirical/presentation_distribution.parquet
+    sequence_table: output/empirical/pick_time_sequence.parquet

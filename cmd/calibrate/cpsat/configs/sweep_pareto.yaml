@@ -1,0 +1,10 @@
+# Pareto sweep — vary both bots and operators to find the frontier
+sweep:
+  bot_counts: [4, 6, 8, 10, 12, 16, 20]
+  operator_counts: [1, 2, 3]
+  seeds: [1, 2, 3]
+  max_waves: 2
+  solver_budget_s: 15
+  time_buffer_s: 2
+  workers: 3
+  classify_phases: true

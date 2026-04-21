@@ -55,6 +55,12 @@ canvas { display:block; }
     <div class="section">
       <div class="section-title" onclick="toggleSection(this)">CP-SAT Solver <span>&#9660;</span></div>
       <div class="section-body">
+        <div class="row"><label>Layout</label>
+          <select id="cfgLayout">
+            <option value="Scp" selected>Scp (baseline, 8 stations)</option>
+            <option value="Ep-Sc">Ep-Sc (8 + 3 east each-pick)</option>
+          </select>
+        </div>
         <div class="row"><label>Slice</label>
           <select id="cfgSlice">
             <option value="south" selected>South Zone (4 stations)</option>
@@ -281,7 +287,7 @@ function loadGraph(raw) {
   const aisles = nodes.filter(n=>n.kind==='AISLE_CELL').map(n=>n.id);
   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
   for (const n of nodes) { minX=Math.min(minX,n.x); maxX=Math.max(maxX,n.x); minY=Math.min(minY,n.y); maxY=Math.max(maxY,n.y); }
-  graph = { nodes, edges, nodeMap, adj, stationOps, palletPositions, aisles, bounds:{minX,maxX,minY,maxY} };
+  graph = { nodes, edges, nodeMap, adj, stationOps, palletPositions, aisles, bounds:{minX,maxX,minY,maxY}, metadata: raw.metadata || {} };
   return graph;
 }
 
@@ -661,16 +667,19 @@ $('dropZone').addEventListener('dragleave',()=>$('dropZone').classList.remove('o
 $('dropZone').addEventListener('drop',e=>{e.preventDefault();$('dropZone').classList.remove('over');const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=ev=>{loadGraph(JSON.parse(ev.target.result));resetSim();$('statusText').textContent=`Loaded: ${f.name} (${graph.nodes.length} nodes)`;};r.readAsText(f);}});
 
 async function loadDefault(){
-  $('statusText').textContent='Loading south zone slice...';
+  const layout = ($('cfgLayout') && $('cfgLayout').value) || 'Scp';
+  $('statusText').textContent=`Loading south zone slice [${layout}]...`;
   try{
-    // Try zone slice first, then full graph
-    let r=await fetch('south-zone-slice.json');
+    // Prefer the layout-labeled slice, fall back to legacy unlabeled slice, then full graph
+    let r=await fetch(`south-zone-slice-${layout}.json`);
+    if(!r.ok) r=await fetch('south-zone-slice.json');
     if(!r.ok) r=await fetch('graph.json');
     if(!r.ok) r=await fetch('../app/public/EVT_3_31_21.json');
     if(!r.ok) throw new Error('not found');
     loadGraph(await r.json());
     resetSim();
-    $('statusText').textContent=`South Zone Slice: ${graph.nodes.length} nodes, ${graph.edges.length} edges, ${graph.stationOps.length} stations`;
+    const variant = (graph.metadata && graph.metadata.variant) || layout;
+    $('statusText').textContent=`South Zone Slice [${variant}]: ${graph.nodes.length} nodes, ${graph.edges.length} edges, ${graph.stationOps.length} stations`;
     // Auto-load schedule if available
     try{
       const sr=await fetch('schedule.json');
@@ -955,8 +964,11 @@ $('btnReset').addEventListener('click', function schedResetOverride(e) {
 // ============================================================
 
 function readSolverConfig() {
+  const layout = $('cfgLayout').value;
   return {
     slice: $('cfgSlice').value,
+    layout,
+    map: `../grainger-pilot-${layout}.json`,
     serviceTime: +$('cfgSvcTime').value,
     timeBuffer: +$('cfgBuffer').value,
     bots: +$('cfgSolverBots').value,
@@ -986,16 +998,23 @@ $('cfgSlice').addEventListener('change', () => {
   // Also auto-load appropriate slice
   autoLoadSliceGraph();
 });
+// Reload slice when layout variant changes
+$('cfgLayout').addEventListener('change', autoLoadSliceGraph);
 
 async function autoLoadSliceGraph() {
   const slice = $('cfgSlice').value;
-  const path = slice === 'casepick' ? 'casepick-slice.json' : 'south-zone-slice.json';
+  const layout = $('cfgLayout').value;
+  // South slices are layout-specific; casepick slice is currently layout-agnostic.
+  const path = slice === 'casepick'
+    ? 'casepick-slice.json'
+    : `south-zone-slice-${layout}.json`;
   try {
     const r = await fetch(path);
     if (r.ok) {
       loadGraph(await r.json());
       resetSim();
-      $('statusText').textContent = `${slice} slice: ${graph.nodes.length} nodes, ${graph.edges.length} edges, ${graph.stationOps.length} stations`;
+      const variant = (graph.metadata && graph.metadata.variant) || layout;
+      $('statusText').textContent = `${slice} slice [${variant}]: ${graph.nodes.length} nodes, ${graph.edges.length} edges, ${graph.stationOps.length} stations`;
     }
   } catch(e) {}
 }
