@@ -181,3 +181,5 @@ service_time:
     casepick_ncv: 86
   pez_dwell_s: 8
   pez_enabled: true
+  empirical:
+    presentation_dist: output/empirical/presentation_distribution.parquet
