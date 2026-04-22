@@ -61,6 +61,7 @@ class ServiceTimeConfig:
     pick_times: dict[str, int] = field(default_factory=dict)
     pez_dwell_s: int = 8           # tray drop/exchange time at PEZ cell
     pez_enabled: bool = True       # include PEZ step in outbound cycle
+    arrival_clearance_s: int = 0   # operator clears station area while bot arrives (safety penalty)
     empirical: dict[str, str] | None = None  # {"presentation_dist": "path", "sequence_table": "path"}
 
 

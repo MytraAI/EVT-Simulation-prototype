@@ -64,6 +64,7 @@ class ServiceTimeModel:
         self.pick_times = config.pick_times
         self.pez_dwell_s = config.pez_dwell_s
         self.pez_enabled = config.pez_enabled
+        self.arrival_clearance_s = getattr(config, 'arrival_clearance_s', 0)
         self._presentation_dist: dict[str, list[tuple[str, float, float]]] | None = None
         self._sequence_table: dict[tuple[str, str], float] | None = None
         self._empirical_paths = config.empirical or {}
@@ -117,9 +118,10 @@ class ServiceTimeModel:
         return self._sequence_table or None
 
     # Midpoint case counts per bucket (used to compute picks/hr)
+    # Midpoint cases per bucket — derived from CON2 avg Cases/Line in SFDC outbound
     _BUCKET_CASES = {
         "1_case": 1, "2-3_cases": 2, "4-6_cases": 5,
-        "7-12_cases": 9, "13+_cases": 20,
+        "7-12_cases": 9, "13+_cases": 63,  # CON2 avg=62.9 for 13+ bucket
     }
 
     def _sample_presentation(self, pick_type: str, rng: random.Random) -> tuple[float, int]:
@@ -161,15 +163,18 @@ class ServiceTimeModel:
                        prev_type: str | None = None) -> tuple[int, int, int]:
         """Sample a full service event. Returns (bot_dwell_s, operator_cycle_s, cases_picked).
 
-        bot_dwell = identify + handle + confirm  (bot stays at op cell)
-        operator_cycle = bot_dwell + 2 × walk    (operator busy including drop-off round trip)
+        bot_dwell = arrival_clearance + identify + handle + confirm
+            (bot stays at op cell; clearance = operator moves to safe area while bot docks)
+        operator_cycle = bot_dwell + 2 × walk
+            (operator busy including drop-off round trip)
         cases_picked = how many cases this presentation picks
         """
         p50, cases = self._sample_presentation(pick_type, rng)
-        dwell = int(round(self.IDENTIFY_S + p50 + self.CONFIRM_S))
+        clearance = self.arrival_clearance_s
+        dwell = int(round(clearance + self.IDENTIFY_S + p50 + self.CONFIRM_S))
         walk_dist = self.walk_distances.get(self._conv_class(pick_type), 2.0)
         walk_s = walk_dist / self.walk_speed
-        op_cyc = int(round(self.IDENTIFY_S + p50 + self.CONFIRM_S + 2 * walk_s))
+        op_cyc = int(round(clearance + self.IDENTIFY_S + p50 + self.CONFIRM_S + 2 * walk_s))
         return dwell, op_cyc, cases
 
     def pick_time(self, pick_type: str, rng: random.Random,
@@ -470,6 +475,8 @@ def solve_with_operators(
     seed: int = 1,
     max_time_s: float = 15.0,
     solver_threads: int | None = None,
+    station_groups_cfg: list | None = None,
+    graph = None,
 ) -> dict | None:
     """CP-SAT solver with explicit operator assignment + transit.
 
@@ -538,6 +545,103 @@ def solve_with_operators(
     for cell, ivals in cell_dwells.items():
         if len(ivals) > 1:
             model.add_no_overlap(ivals)
+
+    # ── Block lock: station-pair mutex ──
+    # Stations in the same block (consecutive pairs sharing a gateway) can't
+    # serve simultaneously. When a bot is being serviced at either station,
+    # the block is locked — no other bot can start service at the partner
+    # station until the first service completes.
+    #
+    # Detect blocks: consecutive station pairs in the config. Each pair of
+    # stations that shares a common XY node in the graph forms a block.
+    # We group by XY adjacency: if station A's xy connects to station B's op
+    # (or vice versa), they're in the same block.
+    from collections import defaultdict as _defaultdict
+    block_id_for_op: dict[str, int] = {}
+    block_counter = 0
+    all_stns = [stn for g in (station_groups_cfg or []) for stn in g.stations] if station_groups_cfg else []
+    # Pair stations by shared XY: if stn_i.xy connects to stn_j.op in graph
+    paired = set()
+    for i, si in enumerate(all_stns):
+        for j, sj in enumerate(all_stns):
+            if i >= j:
+                continue
+            # Check if si's xy connects to sj's op or vice versa
+            si_xy_connects_sj = (si.xy and sj.op and graph is not None and graph.has_edge(si.xy, sj.op))
+            sj_xy_connects_si = (sj.xy and si.op and graph is not None and graph.has_edge(sj.xy, si.op))
+            if si_xy_connects_sj or sj_xy_connects_si:
+                if si.op not in block_id_for_op and sj.op not in block_id_for_op:
+                    block_id_for_op[si.op] = block_counter
+                    block_id_for_op[sj.op] = block_counter
+                    block_counter += 1
+                elif si.op in block_id_for_op:
+                    block_id_for_op[sj.op] = block_id_for_op[si.op]
+                elif sj.op in block_id_for_op:
+                    block_id_for_op[si.op] = block_id_for_op[sj.op]
+
+    if block_id_for_op:
+        # ── Full station lock ──
+        # When a station is occupied (bot being serviced), BOTH:
+        #   1. The station's own dedicated XY is locked (no other bot can enter)
+        #   2. The shared XY between the pair is locked (no access to partner station)
+        #
+        # This means: one service per block at a time, AND the entering bot's
+        # own XY is reserved from approach through service completion.
+        #
+        # Implementation: per-block no-overlap on service windows, PLUS
+        # per-station-XY no-overlap that extends the XY dwell to cover service.
+
+        # 1. Block-level mutex (shared XY): only 1 service per block
+        block_service_intervals: dict[int, list] = _defaultdict(list)
+        for k, (w, b) in enumerate(wave_bots):
+            bid = w * n_base + b.bot_id
+            blk = block_id_for_op.get(b.station_op)
+            if blk is None:
+                continue
+            xy_idx = None
+            for j, cell in enumerate(b.cells):
+                if cell.startswith("xy-") or cell.startswith("pez-"):
+                    xy_idx = j
+                    break
+            if xy_idx is None:
+                xy_idx = max(0, b.service_idx - 1)
+
+            lock_start = starts[(bid, xy_idx)]
+            lock_end = ends[(bid, b.service_idx)]
+            lock_dur = model.new_int_var(1, max_time, f"blk_dur_b{bid}")
+            model.add(lock_dur == lock_end - lock_start + time_buffer_s)
+            lock_e = model.new_int_var(0, max_time + time_buffer_s, f"blk_e_b{bid}")
+            model.add(lock_e == lock_start + lock_dur)
+            ivl = model.new_interval_var(lock_start, lock_dur, lock_e, f"blk_i_b{bid}")
+            block_service_intervals[blk].append(ivl)
+
+        for blk, ivals in block_service_intervals.items():
+            if len(ivals) > 1:
+                model.add_no_overlap(ivals)
+
+        # 2. Per-station XY lock: the bot's own dedicated XY is reserved
+        #    from approach through service end (prevents other bots from
+        #    using it as a transit corridor while this station is active)
+        xy_lock_intervals: dict[str, list] = _defaultdict(list)
+        for k, (w, b) in enumerate(wave_bots):
+            bid = w * n_base + b.bot_id
+            # Find the bot's dedicated XY in its path
+            for j, cell in enumerate(b.cells):
+                if cell.startswith("xy-"):
+                    # Lock from this XY visit through end of service
+                    lk_s = starts[(bid, j)]
+                    lk_e_var = ends[(bid, b.service_idx)]
+                    lk_dur = model.new_int_var(1, max_time, f"xylk_dur_b{bid}_{j}")
+                    model.add(lk_dur == lk_e_var - lk_s + time_buffer_s)
+                    lk_end = model.new_int_var(0, max_time + time_buffer_s, f"xylk_e_b{bid}_{j}")
+                    model.add(lk_end == lk_s + lk_dur)
+                    ivl = model.new_interval_var(lk_s, lk_dur, lk_end, f"xylk_i_b{bid}_{j}")
+                    xy_lock_intervals[cell].append(ivl)
+                    break  # only lock the first XY (the entry gateway)
+
+        for xy_cell, ivals in xy_lock_intervals.items():
+            if len(ivals) > 1:
+                model.add_no_overlap(ivals)
 
     # ── Operator assignment ──
     # For each service event k and operator op, create:
@@ -645,11 +749,50 @@ def solve_with_operators(
         total_op_busy += op_cyc  # every service was assigned to someone
     avg_util = total_op_busy / (num_operators * (wo * waves if wo else ms)) if wo else 0.0
 
+    # ── Extract detailed metrics from the schedule ──
+    schedule_end = ms  # total schedule span
+
+    # Per-bot: time spent in station subsystem = last cell end - first cell start
+    bot_subsystem_times = []
+    for k, (w, b) in enumerate(wave_bots):
+        bid = w * n_base + b.bot_id
+        t_enter = solver.value(starts[(bid, 0)])
+        t_exit = solver.value(ends[(bid, len(b.cells) - 1)])
+        bot_subsystem_times.append(t_exit - t_enter)
+
+    avg_bot_subsystem_s = sum(bot_subsystem_times) / len(bot_subsystem_times) if bot_subsystem_times else 0
+
+    # Per-station: fraction of schedule time the op cell is occupied
+    station_occupied: dict[str, int] = {}
+    for k, (w, b) in enumerate(wave_bots):
+        bid = w * n_base + b.bot_id
+        svc_start_val = solver.value(starts[(bid, b.service_idx)])
+        svc_end_val = solver.value(ends[(bid, b.service_idx)])
+        station_occupied.setdefault(b.station_op, 0)
+        station_occupied[b.station_op] += (svc_end_val - svc_start_val)
+
+    station_util = {}
+    for stn_op, busy_s in station_occupied.items():
+        station_util[stn_op] = min(busy_s / schedule_end, 1.0) if schedule_end > 0 else 0.0
+    avg_station_util = sum(station_util.values()) / len(station_util) if station_util else 0.0
+
+    # Operator utilization: fraction of schedule time each operator is busy
+    # (already computed above as avg_util, but let's be precise from solver values)
+    total_op_busy_from_solver = 0
+    for k, (_, bid, svc_start_var, op_cyc, stn_op) in enumerate(service_events):
+        total_op_busy_from_solver += op_cyc
+    precise_op_util = total_op_busy_from_solver / (num_operators * schedule_end) if schedule_end > 0 and num_operators > 0 else 0.0
+
     return {
         "status": "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
         "wave_offset_s": wo,
         "makespan_s": ms,
-        "peak_queue_depth": 0,
-        "avg_op_utilization": min(avg_util, 1.0),
         "num_operators": num_operators,
+        # Throughput metrics
+        "avg_bot_subsystem_s": round(avg_bot_subsystem_s, 1),
+        # Utilization metrics
+        "avg_op_utilization": round(min(precise_op_util, 1.0), 3),
+        "avg_station_utilization": round(avg_station_util, 3),
+        "station_util_detail": {k: round(v, 3) for k, v in station_util.items()},
+        "peak_queue_depth": 0,
     }
