@@ -477,6 +477,7 @@ def solve_with_operators(
     solver_threads: int | None = None,
     station_groups_cfg: list | None = None,
     graph = None,
+    **kwargs,
 ) -> dict | None:
     """CP-SAT solver with explicit operator assignment + transit.
 
@@ -542,6 +543,26 @@ def solve_with_operators(
         bid = w * n_base + b.bot_id
         for j, cell in enumerate(b.cells):
             cell_dwells.setdefault(cell, []).append(dwell_intervals[(bid, j)])
+
+    # ── PEZ adjacency blocking ──
+    # When a bot is at a PEZ cell, all adjacent cells in the graph are
+    # blocked (no other bot can occupy them simultaneously).  We add the
+    # PEZ dwell interval to each neighbor's no-overlap set before
+    # applying the cell-level no-overlap constraints.
+    all_stns_flat = [stn for g in (station_groups_cfg or []) for stn in g.stations] if station_groups_cfg else []
+    if kwargs.get("pez_blocks_adjacent", False) and graph is not None:
+        pez_cells = {stn.pez for stn in all_stns_flat if stn.pez}
+        for k, (w, b) in enumerate(wave_bots):
+            bid = w * n_base + b.bot_id
+            for j, cell in enumerate(b.cells):
+                if cell not in pez_cells:
+                    continue
+                pez_ivl = dwell_intervals[(bid, j)]
+                for neighbor in graph.neighbors(cell):
+                    if neighbor == cell:
+                        continue
+                    cell_dwells.setdefault(neighbor, []).append(pez_ivl)
+
     for cell, ivals in cell_dwells.items():
         if len(ivals) > 1:
             model.add_no_overlap(ivals)
@@ -552,51 +573,43 @@ def solve_with_operators(
     # the block is locked — no other bot can start service at the partner
     # station until the first service completes.
     #
-    # Detect blocks: consecutive station pairs in the config. Each pair of
-    # stations that shares a common XY node in the graph forms a block.
-    # We group by XY adjacency: if station A's xy connects to station B's op
-    # (or vice versa), they're in the same block.
+    # Detect shared-XY pairs: each pair of stations whose XY gateway
+    # connects to the other's OP forms a pairwise mutex.  Unlike the old
+    # transitive grouping (which collapsed linear chains into one mega-
+    # block), we now create independent no-overlap constraints per XY
+    # gateway — so stations A-B and B-C each get their own mutex.
     from collections import defaultdict as _defaultdict
-    block_id_for_op: dict[str, int] = {}
-    block_counter = 0
     all_stns = [stn for g in (station_groups_cfg or []) for stn in g.stations] if station_groups_cfg else []
-    # Pair stations by shared XY: if stn_i.xy connects to stn_j.op in graph
-    paired = set()
+    # Collect pairwise constraints: each pair gets its own block id
+    block_id_for_op: dict[str, list[int]] = _defaultdict(list)  # op → list of block ids
+    block_counter = 0
     for i, si in enumerate(all_stns):
         for j, sj in enumerate(all_stns):
             if i >= j:
                 continue
-            # Check if si's xy connects to sj's op or vice versa
             si_xy_connects_sj = (si.xy and sj.op and graph is not None and graph.has_edge(si.xy, sj.op))
             sj_xy_connects_si = (sj.xy and si.op and graph is not None and graph.has_edge(sj.xy, si.op))
             if si_xy_connects_sj or sj_xy_connects_si:
-                if si.op not in block_id_for_op and sj.op not in block_id_for_op:
-                    block_id_for_op[si.op] = block_counter
-                    block_id_for_op[sj.op] = block_counter
-                    block_counter += 1
-                elif si.op in block_id_for_op:
-                    block_id_for_op[sj.op] = block_id_for_op[si.op]
-                elif sj.op in block_id_for_op:
-                    block_id_for_op[si.op] = block_id_for_op[sj.op]
+                block_id_for_op[si.op].append(block_counter)
+                block_id_for_op[sj.op].append(block_counter)
+                block_counter += 1
 
     if block_id_for_op:
-        # ── Full station lock ──
-        # When a station is occupied (bot being serviced), BOTH:
-        #   1. The station's own dedicated XY is locked (no other bot can enter)
-        #   2. The shared XY between the pair is locked (no access to partner station)
+        # ── Pairwise station lock ──
+        # For each shared XY gateway, the two adjacent stations cannot
+        # be serviced simultaneously.  A station may participate in
+        # multiple pairwise locks (e.g. the middle station in A-B-C
+        # has constraints with both A and C independently).
         #
-        # This means: one service per block at a time, AND the entering bot's
-        # own XY is reserved from approach through service completion.
-        #
-        # Implementation: per-block no-overlap on service windows, PLUS
-        # per-station-XY no-overlap that extends the XY dwell to cover service.
+        # Additionally, each station's own dedicated XY is reserved from
+        # approach through service completion.
 
-        # 1. Block-level mutex (shared XY): only 1 service per block
+        # 1. Pairwise mutex per shared XY gateway
         block_service_intervals: dict[int, list] = _defaultdict(list)
         for k, (w, b) in enumerate(wave_bots):
             bid = w * n_base + b.bot_id
-            blk = block_id_for_op.get(b.station_op)
-            if blk is None:
+            blks = block_id_for_op.get(b.station_op, [])
+            if not blks:
                 continue
             xy_idx = None
             for j, cell in enumerate(b.cells):
@@ -612,8 +625,9 @@ def solve_with_operators(
             model.add(lock_dur == lock_end - lock_start + time_buffer_s)
             lock_e = model.new_int_var(0, max_time + time_buffer_s, f"blk_e_b{bid}")
             model.add(lock_e == lock_start + lock_dur)
-            ivl = model.new_interval_var(lock_start, lock_dur, lock_e, f"blk_i_b{bid}")
-            block_service_intervals[blk].append(ivl)
+            for blk in blks:
+                ivl = model.new_interval_var(lock_start, lock_dur, lock_e, f"blk_i_b{bid}_g{blk}")
+                block_service_intervals[blk].append(ivl)
 
         for blk, ivals in block_service_intervals.items():
             if len(ivals) > 1:
