@@ -348,14 +348,14 @@ def run_simulation(
     # Track station counts across windows for load balancing
     station_counts = {s: 0 for s in paths_data["station_ops"]}
 
-    total_assigned = 0
+    consumed = set()  # pallets already assigned (by ID)
     window_num = 0
     all_assignments = []
     global_makespan = 0
 
     t0 = time.time()
-    while total_assigned < n_pallets:
-        remaining = pallets_to_process[total_assigned:]
+    while len(consumed) < n_pallets:
+        remaining = [p for p in pallets_to_process if p not in consumed]
         if not remaining:
             break
 
@@ -393,26 +393,47 @@ def run_simulation(
             result = schedule_trips(trips, bots, paths_data, dict(graph_adj), solver_budget_s)
             if result is None:
                 logger.error(f"Window {window_num} still INFEASIBLE. Skipping.")
-                total_assigned += len(trips) if trips else 1
+                # Mark these pallets as consumed to avoid infinite loop
+                for t in trips:
+                    consumed.add(t["pallet"])
                 continue
 
         n_scheduled = result["pallets_scheduled"]
-        total_assigned += n_scheduled
         global_makespan = max(global_makespan, result["makespan"])
 
+        # Mark assigned pallets as consumed
+        for a in result["assignments"]:
+            consumed.add(a["pallet"])
         all_assignments.extend(result["assignments"])
 
-        # Update bot state and station counts
+        # Update bot state and station counts.
+        # Add return trip time from last PEZ to approximate next pallet
+        # to avoid teleportation between windows.
+        pez2p_lookup = paths_data["pez_to_pallet"]
+        next_remaining = [p for p in pallets_to_process if p not in consumed]
         for b in range(n_bots):
             if b in result["bot_end_times"]:
-                bots[b]["available_at"] = result["bot_end_times"][b]
+                base_time = result["bot_end_times"][b]
+                pez_id = result["bot_last_pez"].get(b, "")
+                return_extra = 0
+                if pez_id and next_remaining:
+                    best_ret = None
+                    for pal in next_remaining[:30]:
+                        rk = f"{pez_id}|{pal}"
+                        if rk in pez2p_lookup:
+                            rt = pez2p_lookup[rk]["total_s"]
+                            if best_ret is None or rt < best_ret:
+                                best_ret = rt
+                    if best_ret is not None:
+                        return_extra = best_ret
+                bots[b]["available_at"] = base_time + return_extra
             if b in result["bot_last_pez"]:
                 bots[b]["position"] = result["bot_last_pez"][b]
         for a in result["assignments"]:
             station_counts[a["station"]] = station_counts.get(a["station"], 0) + 1
 
         logger.info(f"  → {n_scheduled} pallets, makespan={result['makespan']}s, "
-                    f"status={result['status']}, total={total_assigned}/{n_pallets}")
+                    f"status={result['status']}, total={len(consumed)}/{n_pallets}")
 
         window_num += 1
 
@@ -448,6 +469,7 @@ def run_simulation(
         "bot_stats": bot_stats,
         "station_stats": station_stats,
         "avg_cycle_s": round(global_makespan / (len(all_assignments) / n_bots), 1) if all_assignments else 0,
+        "assignments": all_assignments,
     }
 
 
