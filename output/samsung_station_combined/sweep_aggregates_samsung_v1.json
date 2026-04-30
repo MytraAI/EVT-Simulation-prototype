@@ -1,0 +1,116 @@
+{
+  "name": "samsung_v1",
+  "graph_path": "samsung_station_slice.json",
+  "num_stations": 4,
+  "station_groups": [
+    {
+      "label": "samsung_v1",
+      "count": 4
+    }
+  ],
+  "sweep": {
+    "bot_counts": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      16,
+      20
+    ],
+    "operator_counts": [
+      1
+    ],
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "max_waves": 2
+  },
+  "points": [
+    {
+      "bot_count": 4,
+      "operators_per_station": 1,
+      "mean_pph": 128.6,
+      "p5_pph": 128.6,
+      "p95_pph": 128.6,
+      "phase": "linear",
+      "seeds": 3
+    },
+    {
+      "bot_count": 6,
+      "operators_per_station": 1,
+      "mean_pph": 109.7,
+      "p5_pph": 107.5,
+      "p95_pph": 110.8,
+      "phase": "collapse",
+      "seeds": 3
+    },
+    {
+      "bot_count": 8,
+      "operators_per_station": 1,
+      "mean_pph": 135.8,
+      "p5_pph": 135.8,
+      "p95_pph": 135.8,
+      "phase": "degradation",
+      "seeds": 3
+    },
+    {
+      "bot_count": 10,
+      "operators_per_station": 1,
+      "mean_pph": 112.3,
+      "p5_pph": 94.5,
+      "p95_pph": 125.9,
+      "phase": "collapse",
+      "seeds": 3
+    },
+    {
+      "bot_count": 12,
+      "operators_per_station": 1,
+      "mean_pph": 110.8,
+      "p5_pph": 97.7,
+      "p95_pph": 123.8,
+      "phase": "collapse",
+      "seeds": 2
+    },
+    {
+      "bot_count": 16,
+      "operators_per_station": 1,
+      "mean_pph": 0.0,
+      "p5_pph": 0.0,
+      "p95_pph": 0.0,
+      "phase": "collapse",
+      "seeds": 0
+    },
+    {
+      "bot_count": 20,
+      "operators_per_station": 1,
+      "mean_pph": 0.0,
+      "p5_pph": 0.0,
+      "p95_pph": 0.0,
+      "phase": "collapse",
+      "seeds": 0
+    }
+  ],
+  "pareto_frontier": [
+    {
+      "bot_count": 4,
+      "operators_per_station": 1,
+      "mean_pph": 128.6,
+      "p5_pph": 128.6,
+      "p95_pph": 128.6,
+      "phase": "linear",
+      "seeds": 3
+    },
+    {
+      "bot_count": 8,
+      "operators_per_station": 1,
+      "mean_pph": 135.8,
+      "p5_pph": 135.8,
+      "p95_pph": 135.8,
+      "phase": "degradation",
+      "seeds": 3
+    }
+  ]
+}

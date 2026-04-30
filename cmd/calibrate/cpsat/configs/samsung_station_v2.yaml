@@ -1,0 +1,42 @@
+# Samsung station slice — v2 layout (4 OP / 9 XY / 3 PEZ)
+# Wave-based contention stress test.
+# Entry/exit: z-columns + northern aisle entrances.
+
+graph_path: samsung_station_slice_v2.json
+
+slice:
+  method: full
+
+station_groups:
+  - label: samsung_v2
+    stations:
+      - {op: op--2--1, xy: xy--1--1, pez: pez--3--1}
+      - {op: op-2--1,  xy: xy-3--1,  pez: pez-4-0}
+      - {op: op-6--1,  xy: xy-5--1,  pez: pez-8-0}
+      - {op: op-10--1, xy: xy-9--1,  pez: pez-8-0}   # shared PEZ with stn 3
+    entry_points: &v2_entries
+      # Spawn points: aisle entrance OPPOSITE each XY (max-y aisle cell in
+      # the XY's column) + Z-columns. station 1 (xy--1--1) has no aisle
+      # column — bots reach op--2--1 via pez--3--1 pallet patch.
+      - a-1-3-4    # opposite xy-3--1 (also Z-column NW)
+      - a-1-5-1    # opposite xy-5--1 (stub aisle)
+      - a-1-7-4    # opposite xy-7--1 (kept for routing alternative)
+      - a-1-9-2    # opposite xy-9--1 (stub aisle)
+      - a-1-7-2    # Z-column (interior)
+    exit_points: *v2_entries
+    allow_same_entry_exit: true
+    pick_type_mix:
+      casepick_conv: 1.0
+
+service_time:
+  overhead_s: 5
+  walk_speed_m_s: 1.67
+  walk_distances:
+    conv: 2.0
+    ncv: 3.5
+  pick_times:
+    casepick_conv: 52
+  pez_dwell_s: 8
+  pez_enabled: true
+  pez_blocks_adjacent: true   # bot at PEZ blocks all graph-adjacent cells
+  arrival_clearance_s: 5

@@ -41,18 +41,26 @@ _W_KIN_LD = None
 _W_THREADS = None
 
 
+_W_PEZ_BLOCK = False
+_W_PEZ_CELLS: set | None = None
+
+
 def _worker_init(graph_path: str, slice_spec_dict: dict,
                  groups_dicts: list[dict], svc_dict: dict,
                  solver_threads: int | None):
     """Initialize worker process: load graph + build service model."""
     global _W_GRAPH, _W_GROUPS, _W_SVC, _W_KIN_UL, _W_KIN_LD, _W_THREADS
+    global _W_PEZ_BLOCK, _W_PEZ_CELLS
     from config_schema import SliceSpec, StationGroupConfig, ServiceTimeConfig, _dict_to_dataclass
     _W_GRAPH = extract_subgraph(graph_path, _dict_to_dataclass(SliceSpec, slice_spec_dict))
     _W_GROUPS = [_dict_to_dataclass(StationGroupConfig, d) for d in groups_dicts]
-    _W_SVC = ServiceTimeModel(_dict_to_dataclass(ServiceTimeConfig, svc_dict))
+    svc_cfg = _dict_to_dataclass(ServiceTimeConfig, svc_dict)
+    _W_SVC = ServiceTimeModel(svc_cfg)
     _W_KIN_UL = DEFAULT_UNLOADED
     _W_KIN_LD = DEFAULT_LOADED
     _W_THREADS = solver_threads
+    _W_PEZ_BLOCK = bool(svc_cfg.pez_blocks_adjacent)
+    _W_PEZ_CELLS = {stn.pez for g in _W_GROUPS for stn in g.stations if stn.pez}
 
 
 def _worker_solve(task: tuple) -> dict:
@@ -68,7 +76,10 @@ def _worker_solve(task: tuple) -> dict:
         res = solve_wave_schedule(bots, waves=w, time_buffer_s=time_buffer_s,
                                   seed=seed, max_time_s=budget_s,
                                   operators_per_station=ops,
-                                  solver_threads=_W_THREADS)
+                                  solver_threads=_W_THREADS,
+                                  pez_blocks_adjacent=_W_PEZ_BLOCK,
+                                  pez_cells=_W_PEZ_CELLS,
+                                  graph=_W_GRAPH)
         if res is None:
             if best is not None:
                 break
@@ -188,6 +199,8 @@ def run_sweep(cfg: FullConfig, output_dir: Path) -> dict:
         logger.info("Pool wall time: %.1fs", time.time() - t0)
     else:
         svc = ServiceTimeModel(sc.service_time)
+        pez_block = bool(sc.service_time.pez_blocks_adjacent)
+        pez_cells_set = {stn.pez for g in sc.station_groups for stn in g.stations if stn.pez}
         for n, ops, seed, mw, tb, budget in tasks:
             rng = random.Random(seed)
             bots = build_bots_from_config(graph, sc.station_groups, n,
@@ -197,7 +210,10 @@ def run_sweep(cfg: FullConfig, output_dir: Path) -> dict:
             for w in range(1, mw + 1):
                 res = solve_wave_schedule(bots, waves=w, time_buffer_s=tb,
                                           seed=seed, max_time_s=budget,
-                                          operators_per_station=ops)
+                                          operators_per_station=ops,
+                                          pez_blocks_adjacent=pez_block,
+                                          pez_cells=pez_cells_set,
+                                          graph=graph)
                 if res is None:
                     if best is not None:
                         break

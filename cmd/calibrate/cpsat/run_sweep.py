@@ -441,7 +441,10 @@ def solve_wave_schedule(bots: list, waves: int, time_buffer_s: int,
                        seed: int, max_time_s: float = 30.0,
                        async_mode: bool = False,
                        operators_per_station: int = 1,
-                       solver_threads: int | None = None) -> dict | None:
+                       solver_threads: int | None = None,
+                       pez_blocks_adjacent: bool = False,
+                       pez_cells: set | None = None,
+                       graph = None) -> dict | None:
     """Return {status, wave_offset_s, makespan_s} or None if infeasible.
 
     operators_per_station: number of operators at each station. With N>1,
@@ -500,15 +503,42 @@ def solve_wave_schedule(bots: list, waves: int, time_buffer_s: int,
                 model.add(de == s + dw)
             dwell_intervals[(bid, j)] = model.new_interval_var(s, dw, de, f"di_b{bid}_{j}")
 
-    # Per-cell no-overlap
-    cell_dwells: dict[str, list] = {}
+    # Per-cell dwells, tracked per bot so PEZ adjacency blocking can exclude
+    # the same bot's own visits to neighbor cells (a bot's PEZ stay must not
+    # conflict with its own buffered approach/exit through adjacent cells).
+    from collections import defaultdict as _dd
+    cell_bot_dwells: dict[str, dict[int, list]] = _dd(lambda: _dd(list))
     for k, (w, b) in enumerate(wave_bots):
         bid = w * n_base + b.bot_id
         for j, cell in enumerate(b.cells):
-            cell_dwells.setdefault(cell, []).append(dwell_intervals[(bid, j)])
-    for cell, ivals in cell_dwells.items():
+            cell_bot_dwells[cell][bid].append(dwell_intervals[(bid, j)])
+
+    # Cell no-overlap (all bot intervals on the same cell must be sequential)
+    for cell, by_bot in cell_bot_dwells.items():
+        ivals = [iv for lst in by_bot.values() for iv in lst]
         if len(ivals) > 1:
             model.add_no_overlap(ivals)
+
+    # PEZ adjacency blocking: while a bot dwells at a PEZ cell, all cells
+    # adjacent to that PEZ in the graph must be free of OTHER bots'
+    # intervals. (Same-bot exclusion: the buffered approach/exit dwells
+    # touch the PEZ dwell at the boundary by `time_buffer_s`, so we must
+    # not conflict the bot's own PEZ block with its own neighbor dwells.)
+    if pez_blocks_adjacent and pez_cells and graph is not None:
+        for k, (w, b) in enumerate(wave_bots):
+            bid = w * n_base + b.bot_id
+            for j, cell in enumerate(b.cells):
+                if cell not in pez_cells:
+                    continue
+                pez_ivl = dwell_intervals[(bid, j)]
+                for neighbor in graph.neighbors(cell):
+                    if neighbor == cell:
+                        continue
+                    for other_bid, other_ivals in cell_bot_dwells.get(neighbor, {}).items():
+                        if other_bid == bid:
+                            continue
+                        for other_ivl in other_ivals:
+                            model.add_no_overlap([pez_ivl, other_ivl])
 
     # Per-station operator resource (virtual).
     # Bot's physical dwell at op cell = pick_time (shorter). Operator continues
