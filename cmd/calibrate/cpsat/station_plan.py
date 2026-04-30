@@ -24,8 +24,42 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import networkx as nx
+
 from config_schema import ServiceTimeConfig, StationDef, StationGroupConfig
 from graph_utils import BotKinematics, edge_travel_time, path_travel_time, shortest_path
+
+
+def _nearest_pez_path(graph, source: str, pez_pool: set[str],
+                      kin: BotKinematics) -> tuple[str | None, list[str]]:
+    """Find the PEZ in `pez_pool` minimizing kinematic travel time from `source`.
+
+    Returns (pez_id, path_cells_inclusive). Returns (None, []) if no PEZ is reachable.
+    Uses Dijkstra on edge travel time (no axis-transition penalty in weighting,
+    which is fine because we just need a fast tie-breaker between candidates).
+    """
+    if not pez_pool:
+        return None, []
+
+    def w(u, v, ed):
+        return max(0.1, edge_travel_time(ed["distance_m"], ed["axis"], None, kin))
+
+    best_pez = None
+    best_path: list[str] = []
+    best_t = float("inf")
+    for pez in pez_pool:
+        if pez not in graph.nodes:
+            continue
+        try:
+            path = nx.dijkstra_path(graph, source, pez, weight=w)
+            t = path_travel_time(graph, path, kin)
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            continue
+        if t < best_t:
+            best_t = t
+            best_pez = pez
+            best_path = path
+    return best_pez, best_path
 
 logger = logging.getLogger(__name__)
 
@@ -266,25 +300,58 @@ def _build_baseline_plan(graph, stn: StationDef, entry: str, exit_pt: str,
                          kin_in: BotKinematics, kin_out: BotKinematics,
                          bot_id: int, pick_type: str,
                          svc: ServiceTimeModel, rng: random.Random,
-                         prev_type: str | None = None) -> BotPlan:
+                         prev_type: str | None = None,
+                         pez_pool: set[str] | None = None) -> BotPlan:
     """Baseline topology: approach via xy gateway, service at op, depart via xy.
 
-    Outbound cycle with PEZ (when station has pez and svc.pez_enabled):
-        entry → ... → xy → OP (pick) → xy → PEZ (drop tray) → xy → ... → exit
+    Outbound cycle with PEZ (when ``pez_pool`` is non-empty and
+    svc.pez_enabled):
+        entry → ... → xy → OP (pick) → ...graph_path... → PEZ (drop tray) →
+        ...graph_path... → exit
+    The bot picks the **nearest reachable PEZ** from ``pez_pool`` (defaults
+    to the station's configured pez when pool is None) using a Dijkstra
+    weighted by kinematic travel time. No edge is faked — every consecutive
+    pair in the cell sequence is a real graph edge.
+
     Without PEZ:
         entry → ... → xy → OP (pick) → xy → ... → exit
     """
     dwell, op_cyc, cases = svc.sample_service(pick_type, rng, prev_type)
     approach = shortest_path(graph, entry, stn.xy)
-    depart = shortest_path(graph, stn.xy, exit_pt)
 
-    # Build cell sequence — include PEZ tray-drop step if enabled + station has PEZ
-    if svc.pez_enabled and stn.pez and stn.pez in graph.nodes:
-        # Outbound: approach → OP (service) → XY → PEZ (tray drop) → XY → depart
-        cells = approach + [stn.op, stn.xy, stn.pez, stn.xy] + depart[1:]
-        service_idx = len(approach)      # OP cell
-        pez_idx = len(approach) + 2      # PEZ cell (2 after OP: op, xy, PEZ)
+    # Effective PEZ pool: full set if provided, else just the station's own pez
+    pool = pez_pool if pez_pool is not None else (
+        {stn.pez} if (stn.pez and stn.pez in graph.nodes) else set()
+    )
+    pool = {p for p in pool if p in graph.nodes}
+
+    if svc.pez_enabled and pool:
+        # Step 1: from OP, find the nearest PEZ via a real graph path
+        # (loaded kin while holding the tray to drop).
+        chosen_pez, op_to_pez = _nearest_pez_path(graph, stn.op, pool, kin_in)
+        # Step 2: from that PEZ, route to the exit (unloaded kin).
+        if chosen_pez is not None:
+            try:
+                pez_to_exit = shortest_path(graph, chosen_pez, exit_pt)
+            except Exception:
+                pez_to_exit = []
+            if op_to_pez and pez_to_exit:
+                # cells = approach[entry..xy] + op_to_pez[op..pez] + pez_to_exit[pez+1..exit]
+                # approach ends at xy; op_to_pez[0]=op (xy→op is a real graph edge);
+                # op_to_pez[-1]=pez; pez_to_exit[0]=pez so we drop it.
+                cells = approach + op_to_pez + pez_to_exit[1:]
+                service_idx = len(approach)                       # OP cell index
+                pez_idx = len(approach) + len(op_to_pez) - 1      # PEZ cell index
+            else:
+                cells = approach + [stn.op, stn.xy] + shortest_path(graph, stn.xy, exit_pt)[1:]
+                service_idx = len(approach)
+                pez_idx = None
+        else:
+            cells = approach + [stn.op, stn.xy] + shortest_path(graph, stn.xy, exit_pt)[1:]
+            service_idx = len(approach)
+            pez_idx = None
     else:
+        depart = shortest_path(graph, stn.xy, exit_pt)
         cells = approach + [stn.op, stn.xy] + depart[1:]
         service_idx = len(approach)
         pez_idx = None
@@ -302,6 +369,7 @@ def _build_baseline_plan(graph, stn: StationDef, entry: str, exit_pt: str,
             durations.append(max(1, round(t)))
             prev_axis = ed["axis"]
         else:
+            # Should not happen now that we use real graph paths.
             durations.append(1)
     return BotPlan(bot_id, stn.op, pick_type, dwell, op_cyc, cells, durations, service_idx, cases)
 
@@ -390,9 +458,18 @@ def build_bot_plan(graph, stn: StationDef, entry: str, exit_pt: str,
                    kin_in: BotKinematics, kin_out: BotKinematics,
                    bot_id: int, pick_type: str,
                    svc: ServiceTimeModel, rng: random.Random,
-                   prev_type: str | None = None) -> BotPlan:
-    """Unified bot plan builder. Dispatches on station.topology."""
+                   prev_type: str | None = None,
+                   pez_pool: set[str] | None = None) -> BotPlan:
+    """Unified bot plan builder. Dispatches on station.topology.
+
+    pez_pool: when set, the baseline builder picks the nearest PEZ from this
+    set instead of the station's configured pez. Allows bots to drop trays
+    at whichever PEZ is shortest from their OP via real graph paths.
+    """
     builder = _BUILDERS.get(stn.topology, _build_baseline_plan)
+    if stn.topology == "baseline" or builder is _build_baseline_plan:
+        return builder(graph, stn, entry, exit_pt, kin_in, kin_out,
+                       bot_id, pick_type, svc, rng, prev_type, pez_pool=pez_pool)
     return builder(graph, stn, entry, exit_pt, kin_in, kin_out,
                    bot_id, pick_type, svc, rng, prev_type)
 
@@ -432,6 +509,14 @@ def build_bots_from_config(
     used_idx: dict[str, int] = {stn.op: 0 for g in station_groups for stn in g.stations}
     prev_type_at: dict[str, str | None] = {stn.op: None for g in station_groups for stn in g.stations}
 
+    # Global PEZ pool: bots pick whichever PEZ is shortest from their OP via
+    # real graph paths. Without this, a station's path forces a (possibly
+    # non-existent) edge from XY → assigned PEZ.
+    pez_pool: set[str] = {
+        stn.pez for g in station_groups for stn in g.stations
+        if stn.pez and stn.pez in graph.nodes
+    }
+
     bots: list[BotPlan] = []
     for bid in range(num_bots):
         gi, si = flat[bid % len(flat)]
@@ -446,7 +531,8 @@ def build_bots_from_config(
 
         prev_pt = prev_type_at[stn.op]
         bot = build_bot_plan(graph, stn, ep, xp, kin_unloaded, kin_loaded,
-                             bid, pt, svc, rng, prev_pt)
+                             bid, pt, svc, rng, prev_pt,
+                             pez_pool=pez_pool)
         bots.append(bot)
         prev_type_at[stn.op] = pt
 

@@ -32,47 +32,47 @@
     {
       "bot_count": 4,
       "operators_per_station": 1,
-      "mean_pph": 128.6,
-      "p5_pph": 128.6,
-      "p95_pph": 128.6,
+      "mean_pph": 99.0,
+      "p5_pph": 61.0,
+      "p95_pph": 118.0,
       "phase": "linear",
       "seeds": 3
     },
     {
       "bot_count": 6,
       "operators_per_station": 1,
-      "mean_pph": 109.7,
-      "p5_pph": 107.5,
-      "p95_pph": 110.8,
+      "mean_pph": 74.3,
+      "p5_pph": 59.2,
+      "p95_pph": 81.8,
       "phase": "collapse",
       "seeds": 3
     },
     {
       "bot_count": 8,
       "operators_per_station": 1,
-      "mean_pph": 135.8,
-      "p5_pph": 135.8,
-      "p95_pph": 135.8,
-      "phase": "degradation",
+      "mean_pph": 73.3,
+      "p5_pph": 73.3,
+      "p95_pph": 73.3,
+      "phase": "collapse",
       "seeds": 3
     },
     {
       "bot_count": 10,
       "operators_per_station": 1,
-      "mean_pph": 112.3,
-      "p5_pph": 94.5,
-      "p95_pph": 125.9,
+      "mean_pph": 67.5,
+      "p5_pph": 64.9,
+      "p95_pph": 72.9,
       "phase": "collapse",
       "seeds": 3
     },
     {
       "bot_count": 12,
       "operators_per_station": 1,
-      "mean_pph": 110.8,
-      "p5_pph": 97.7,
-      "p95_pph": 123.8,
+      "mean_pph": 0.0,
+      "p5_pph": 0.0,
+      "p95_pph": 0.0,
       "phase": "collapse",
-      "seeds": 2
+      "seeds": 0
     },
     {
       "bot_count": 16,
@@ -97,19 +97,10 @@
     {
       "bot_count": 4,
       "operators_per_station": 1,
-      "mean_pph": 128.6,
-      "p5_pph": 128.6,
-      "p95_pph": 128.6,
+      "mean_pph": 99.0,
+      "p5_pph": 61.0,
+      "p95_pph": 118.0,
       "phase": "linear",
-      "seeds": 3
-    },
-    {
-      "bot_count": 8,
-      "operators_per_station": 1,
-      "mean_pph": 135.8,
-      "p5_pph": 135.8,
-      "p95_pph": 135.8,
-      "phase": "degradation",
       "seeds": 3
     }
   ]
