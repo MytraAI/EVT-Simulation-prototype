@@ -8,7 +8,7 @@
 | Layout | Peak PPH | Peak @ bots | Collapse @ bots | Wave offset @ peak |
 |---|---:|---:|---:|---:|
 | samsung_v1 | **118.0** | 4 | 12 | 122s |
-| samsung_v2 | **109.5** | 8 | 16 | 263s |
+| samsung_v2 | **150.0** | 6 | 16 | 144s |
 
 ## Throughput vs Bot Count
 
@@ -21,7 +21,7 @@
 - **n=4** 🟢 mean **118.0** PPH (P5/P95: 118/118, var 0), wave=122s, op_util=0.53, phase=linear
 - **n=6** 🔴 mean **74.3** PPH (P5/P95: 59/82, var 23), wave=298s, op_util=0.33, phase=collapse
 - **n=8** 🔴 mean **73.3** PPH (P5/P95: 73/73, var 0), wave=393s, op_util=0.33, phase=collapse
-- **n=10** 🔴 mean **73.3** PPH (P5/P95: 70/75, var 5), wave=492s, op_util=0.33, phase=collapse
+- **n=10** 🔴 mean **67.5** PPH (P5/P95: 65/72, var 7), wave=534s, op_util=0.30, phase=collapse
 - **n=12** 🔴 mean **0.0** PPH (P5/P95: 0/0, var 0), wave=0s, op_util=0.00, phase=collapse, **3 deadlock**
 - **n=16** 🔴 mean **0.0** PPH (P5/P95: 0/0, var 0), wave=0s, op_util=0.00, phase=collapse, **3 deadlock**
 - **n=20** 🔴 mean **0.0** PPH (P5/P95: 0/0, var 0), wave=0s, op_util=0.00, phase=collapse, **3 deadlock**
@@ -29,11 +29,11 @@
 ### samsung_v2
 
 - **n=4** 🟢 mean **101.4** PPH (P5/P95: 101/101, var 0), wave=142s, op_util=0.45, phase=linear
-- **n=6** 🔴 mean **87.7** PPH (P5/P95: 84/96, var 12), wave=247s, op_util=0.39, phase=collapse
-- **n=8** 🟡 mean **109.5** PPH (P5/P95: 110/110, var 0), wave=263s, op_util=0.49, phase=degradation
-- **n=10** 🔴 mean **91.2** PPH (P5/P95: 88/96, var 8), wave=396s, op_util=0.41, phase=collapse
-- **n=12** 🔴 mean **100.1** PPH (P5/P95: 91/116, var 25), wave=436s, op_util=0.45, phase=collapse
-- **n=16** 🔴 mean **103.2** PPH (P5/P95: 103/103, var 0), wave=558s, op_util=0.31, phase=collapse, **1 deadlock**
+- **n=6** 🟢 mean **150.0** PPH (P5/P95: 150/150, var 0), wave=144s, op_util=0.67, phase=linear
+- **n=8** 🔴 mean **110.8** PPH (P5/P95: 111/111, var 0), wave=260s, op_util=0.49, phase=collapse
+- **n=10** 🔴 mean **102.3** PPH (P5/P95: 89/122, var 32), wave=358s, op_util=0.46, phase=collapse
+- **n=12** 🔴 mean **115.0** PPH (P5/P95: 114/116, var 2), wave=376s, op_util=0.51, phase=collapse
+- **n=16** 🔴 mean **96.8** PPH (P5/P95: 97/97, var 0), wave=595s, op_util=0.14, phase=collapse, **2 deadlock**
 - **n=20** 🔴 mean **0.0** PPH (P5/P95: 0/0, var 0), wave=0s, op_util=0.00, phase=collapse, **3 deadlock**
 
 ## Bottleneck Analysis

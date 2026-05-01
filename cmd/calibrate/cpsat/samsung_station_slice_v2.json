@@ -1483,6 +1483,108 @@
       "pallet_meta": {
         "travel": false
       }
+    },
+    {
+      "id": "a-1--3-0",
+      "kind": "AISLE_CELL",
+      "level": 1,
+      "position": {
+        "x_m": -3.937,
+        "y_m": 0.762,
+        "z_m": 0
+      },
+      "x": -3,
+      "y": 0,
+      "size_x_m": 1.5748,
+      "size_y_m": 1.524,
+      "has_charger": false,
+      "max_pallet_height_m": 2.7432,
+      "max_pallet_mass_kg": 1000
+    },
+    {
+      "id": "a-1--2-0",
+      "kind": "AISLE_CELL",
+      "level": 1,
+      "position": {
+        "x_m": -2.3622,
+        "y_m": 0.762,
+        "z_m": 0
+      },
+      "x": -2,
+      "y": 0,
+      "size_x_m": 1.5748,
+      "size_y_m": 1.524,
+      "has_charger": false,
+      "max_pallet_height_m": 2.7432,
+      "max_pallet_mass_kg": 1000
+    },
+    {
+      "id": "a-1--1-0",
+      "kind": "AISLE_CELL",
+      "level": 1,
+      "position": {
+        "x_m": -0.7874,
+        "y_m": 0.762,
+        "z_m": 0
+      },
+      "x": -1,
+      "y": 0,
+      "size_x_m": 1.5748,
+      "size_y_m": 1.524,
+      "has_charger": false,
+      "max_pallet_height_m": 2.7432,
+      "max_pallet_mass_kg": 1000
+    },
+    {
+      "id": "a-1-0-0",
+      "kind": "AISLE_CELL",
+      "level": 1,
+      "position": {
+        "x_m": 0.7874,
+        "y_m": 0.762,
+        "z_m": 0
+      },
+      "x": 0,
+      "y": 0,
+      "size_x_m": 1.5748,
+      "size_y_m": 1.524,
+      "has_charger": false,
+      "max_pallet_height_m": 2.7432,
+      "max_pallet_mass_kg": 1000
+    },
+    {
+      "id": "a-1-1-0",
+      "kind": "AISLE_CELL",
+      "level": 1,
+      "position": {
+        "x_m": 2.3622,
+        "y_m": 0.762,
+        "z_m": 0
+      },
+      "x": 1,
+      "y": 0,
+      "size_x_m": 1.5748,
+      "size_y_m": 1.524,
+      "has_charger": false,
+      "max_pallet_height_m": 2.7432,
+      "max_pallet_mass_kg": 1000
+    },
+    {
+      "id": "a-1-2-0",
+      "kind": "AISLE_CELL",
+      "level": 1,
+      "position": {
+        "x_m": 3.937,
+        "y_m": 0.762,
+        "z_m": 0
+      },
+      "x": 2,
+      "y": 0,
+      "size_x_m": 1.5748,
+      "size_y_m": 1.524,
+      "has_charger": false,
+      "max_pallet_height_m": 2.7432,
+      "max_pallet_mass_kg": 1000
     }
   ],
   "edges": [
@@ -2156,6 +2258,110 @@
       "axis": "y",
       "distance_m": 1.778,
       "id": "pez--3--1-p-1-0--4-1",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1--3-0",
+      "b": "p-1-0--4-0",
+      "axis": "x",
+      "distance_m": 1.5748,
+      "id": "a-1--3-0-p-1-0--4-0",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1--3-0",
+      "b": "a-1--2-0",
+      "axis": "x",
+      "distance_m": 1.5748,
+      "id": "a-1--3-0-a-1--2-0",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1--3-0",
+      "b": "pez--3--1",
+      "axis": "y",
+      "distance_m": 1.524,
+      "id": "a-1--3-0-pez--3--1",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1--2-0",
+      "b": "a-1--1-0",
+      "axis": "x",
+      "distance_m": 1.5748,
+      "id": "a-1--2-0-a-1--1-0",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1--2-0",
+      "b": "op--2--1",
+      "axis": "y",
+      "distance_m": 1.524,
+      "id": "a-1--2-0-op--2--1",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1--1-0",
+      "b": "a-1-0-0",
+      "axis": "x",
+      "distance_m": 1.5748,
+      "id": "a-1--1-0-a-1-0-0",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1--1-0",
+      "b": "xy--1--1",
+      "axis": "y",
+      "distance_m": 1.524,
+      "id": "a-1--1-0-xy--1--1",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1-0-0",
+      "b": "a-1-1-0",
+      "axis": "x",
+      "distance_m": 1.5748,
+      "id": "a-1-0-0-a-1-1-0",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1-0-0",
+      "b": "xy-0--1",
+      "axis": "y",
+      "distance_m": 1.524,
+      "id": "a-1-0-0-xy-0--1",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1-1-0",
+      "b": "a-1-2-0",
+      "axis": "x",
+      "distance_m": 1.5748,
+      "id": "a-1-1-0-a-1-2-0",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1-1-0",
+      "b": "xy-1--1",
+      "axis": "y",
+      "distance_m": 1.524,
+      "id": "a-1-1-0-xy-1--1",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1-2-0",
+      "b": "a-1-3-0",
+      "axis": "x",
+      "distance_m": 1.5748,
+      "id": "a-1-2-0-a-1-3-0",
+      "max_pallet_height_m": 1.8288
+    },
+    {
+      "a": "a-1-2-0",
+      "b": "op-2--1",
+      "axis": "y",
+      "distance_m": 1.524,
+      "id": "a-1-2-0-op-2--1",
       "max_pallet_height_m": 1.8288
     }
   ],

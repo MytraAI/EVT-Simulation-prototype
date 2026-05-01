@@ -59,9 +59,9 @@
     {
       "bot_count": 10,
       "operators_per_station": 1,
-      "mean_pph": 73.3,
-      "p5_pph": 69.9,
-      "p95_pph": 75.3,
+      "mean_pph": 67.5,
+      "p5_pph": 65.1,
+      "p95_pph": 71.9,
       "phase": "collapse",
       "seeds": 3
     },

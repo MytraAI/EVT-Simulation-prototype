@@ -48,7 +48,8 @@ def short_label(node: dict) -> str:
 
 def draw_slice(ax, graph_path: Path, title: str, station_chain: list[dict]) -> None:
     g = json.load(open(graph_path))
-    nodes = g["nodes"]
+    # Restrict to L1 only — the slice is L1
+    nodes = [n for n in g["nodes"] if n.get("level", 1) == 1]
 
     # Pallet columns: collapse multi-row pallets at same (x, y) into a single block
     pallet_xy = {}
@@ -103,20 +104,32 @@ def draw_slice(ax, graph_path: Path, title: str, station_chain: list[dict]) -> N
         ax.text(x, y, short_label(n), ha="center", va="center",
                 fontsize=7, color="#222")
 
-    # Station chain labels (bottom)
+    # Slice extent rectangle (y ∈ [-1, 4]) — the zone the sweep operates on
+    slice_rect = mpatches.Rectangle(
+        (x_min + 0.5, -1.5), x_max - x_min - 1, 6,
+        facecolor="none", edgecolor="#d62728", linewidth=2.0,
+        linestyle="-", alpha=0.6,
+    )
+    ax.add_patch(slice_rect)
+    ax.text(x_max - 0.6, 4.55, "station-zone slice (y∈[-1..4])",
+            ha="right", va="bottom", fontsize=8,
+            color="#d62728", fontweight="bold")
+
+    # Station chain labels (under chain row)
     for stn in station_chain:
         sx = stn["x"]
-        ax.text(sx, y_min + 0.1, stn["label"],
-                ha="center", va="bottom", fontsize=8, fontweight="bold",
+        ax.text(sx, -2.0, stn["label"],
+                ha="center", va="top", fontsize=8, fontweight="bold",
                 color="#1f4e98")
 
-    # Y axis labels showing row number
+    # Y axis tick labels every 2 rows
     for y in range(y_min + 1, y_max):
-        ax.text(x_min + 0.3, y, f"y={y}", ha="left", va="center",
-                fontsize=7, color="#666")
+        if y % 2 == 0 or y in (-1, 1):
+            ax.text(x_min + 0.55, y, f"y={y}", ha="left", va="center",
+                    fontsize=6, color="#888")
 
     ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
+    ax.set_ylim(y_min - 1.5, y_max)
     ax.set_aspect("equal")
     ax.set_title(title, fontsize=12, fontweight="bold")
     ax.set_xticks(range(x_min + 1, x_max))
@@ -127,8 +140,8 @@ def draw_slice(ax, graph_path: Path, title: str, station_chain: list[dict]) -> N
 
 
 def main():
-    fig, axes = plt.subplots(2, 1, figsize=(12, 9),
-                              gridspec_kw={"hspace": 0.25})
+    fig, axes = plt.subplots(1, 2, figsize=(15, 11),
+                              gridspec_kw={"wspace": 0.15})
 
     v1_chain = [
         {"x": 1, "label": "PEZ-1"}, {"x": 2, "label": "Stn 1\nop-2"},
@@ -142,6 +155,8 @@ def main():
         {"x": 10, "label": "Stn 4\nop-10"},
     ]
 
+    # Render the slice JSONs (patched to include the y=0 front row in front
+    # of every station). These are the actual graphs the bots see.
     draw_slice(axes[0], HERE / "samsung_station_slice.json",
                "v1 — Compact chain (4 OP, 4 XY, 4 PEZ)", v1_chain)
     draw_slice(axes[1], HERE / "samsung_station_slice_v2.json",
@@ -151,7 +166,7 @@ def main():
     # Combined legend
     legend_handles = [
         mpatches.Patch(facecolor=KIND_STYLE["STATION_OP"]["face"],
-                       edgecolor=KIND_STYLE["STATION_OP"]["edge"], label="OP (operator pick cell)"),
+                       edgecolor=KIND_STYLE["STATION_OP"]["edge"], label="OP (operator pick)"),
         mpatches.Patch(facecolor=KIND_STYLE["STATION_XY"]["face"],
                        edgecolor=KIND_STYLE["STATION_XY"]["edge"], label="XY (gateway)"),
         mpatches.Patch(facecolor=KIND_STYLE["STATION_PEZ"]["face"],
@@ -164,11 +179,13 @@ def main():
                        edgecolor=KIND_STYLE["PALLET_POSITION"]["edge"], label="pallet"),
         mpatches.Patch(facecolor="none", edgecolor="#d62728", linewidth=2,
                        linestyle="--", label="spawn point (entry/exit)"),
+        mpatches.Patch(facecolor="none", edgecolor="#d62728", linewidth=2,
+                       label="station-zone slice (y∈[-1..4])"),
     ]
-    fig.legend(handles=legend_handles, loc="upper center", ncol=7,
+    fig.legend(handles=legend_handles, loc="upper center", ncol=8,
                bbox_to_anchor=(0.5, 0.02), frameon=False, fontsize=9)
 
-    fig.suptitle("Samsung station slice layouts — v1 vs v2", fontsize=14, y=0.99)
+    fig.suptitle("Samsung station slice layout — v1 vs v2", fontsize=14, y=0.99)
     fig.tight_layout(rect=(0, 0.04, 1, 0.97))
 
     out = ASSETS / "samsung_station_layouts.png"
