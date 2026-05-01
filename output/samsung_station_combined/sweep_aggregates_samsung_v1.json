@@ -32,8 +32,8 @@
     {
       "bot_count": 4,
       "operators_per_station": 1,
-      "mean_pph": 118.0,
-      "p5_pph": 118.0,
+      "mean_pph": 99.0,
+      "p5_pph": 61.0,
       "p95_pph": 118.0,
       "phase": "linear",
       "seeds": 3
@@ -59,9 +59,9 @@
     {
       "bot_count": 10,
       "operators_per_station": 1,
-      "mean_pph": 67.5,
-      "p5_pph": 65.1,
-      "p95_pph": 71.9,
+      "mean_pph": 68.5,
+      "p5_pph": 65.0,
+      "p95_pph": 72.7,
       "phase": "collapse",
       "seeds": 3
     },
@@ -97,8 +97,8 @@
     {
       "bot_count": 4,
       "operators_per_station": 1,
-      "mean_pph": 118.0,
-      "p5_pph": 118.0,
+      "mean_pph": 99.0,
+      "p5_pph": 61.0,
       "p95_pph": 118.0,
       "phase": "linear",
       "seeds": 3
